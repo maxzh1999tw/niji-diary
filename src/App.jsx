@@ -672,6 +672,10 @@ function RainbowModal({ day, lang, t, exporting, onClose, onSave, onShare, onCap
   return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
 }
 
+function PrinterTopShell({ foreground = false }) {
+  return <div className={`printer-shell printer-shell-top ${foreground ? 'printer-shell-mask' : ''}`} aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div>
+}
+
 function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
   const [printComplete, setPrintComplete] = useState(false)
 
@@ -687,7 +691,7 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
   const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><div className="printer-shell printer-shell-top" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="printer-shell printer-shell-bottom" aria-hidden="true" /></div>
+    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><PrinterTopShell /><div className="printer-shell printer-shell-bottom" aria-hidden="true" /><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><PrinterTopShell foreground /></div>
     <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
     <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
     <div className="share-targets" aria-label={t.shareTargets}><span>LINE</span><span>IG STORY</span><span>THREADS</span></div>
