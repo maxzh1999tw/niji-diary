@@ -19,6 +19,7 @@ function Icon({ name, size = 24 }) {
   if (name === 'angle') return <svg {...common}><path d="M5 19 12 5l7 14" /><path d="M8.5 12a7 7 0 0 0 7 0" /></svg>
   if (name === 'download') return <svg {...common}><path d="M12 3v13" /><path d="m7 11 5 5 5-5" /><path d="M4 21h16" /></svg>
   if (name === 'share') return <svg {...common}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.4" /><path d="m8.7 13.3 6.6 4.4" /></svg>
+  if (name === 'edit') return <svg {...common}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
   if (name === 'book') return <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
@@ -108,6 +109,92 @@ function drawCover(context, image, width, height) {
     sourceY = (image.height - sourceHeight) / 2
   }
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height)
+}
+
+function drawCoverAt(context, image, x, y, width, height) {
+  context.save()
+  context.translate(x, y)
+  drawCover(context, image, width, height)
+  context.restore()
+}
+
+function fitCanvasText(context, text, maxWidth) {
+  if (context.measureText(text).width <= maxWidth) return text
+  let fitted = text
+  while (fitted.length && context.measureText(`${fitted}…`).width > maxWidth) fitted = fitted.slice(0, -1)
+  return `${fitted}…`
+}
+
+async function renderPolaroidImage(day, lang, fallbackCaption) {
+  if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
+  await document.fonts?.ready
+  const width = 1000
+  const height = 1450
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { alpha: false })
+  const paper = context.createLinearGradient(0, 0, width, height)
+  paper.addColorStop(0, '#ffffff')
+  paper.addColorStop(0.58, '#fdfcf9')
+  paper.addColorStop(1, '#f5f3ee')
+  context.fillStyle = paper
+  context.fillRect(0, 0, width, height)
+
+  const mainImage = await loadImageSource(day.cardImage)
+  const photoX = 35
+  const photoY = 35
+  const photoWidth = 930
+  const photoHeight = 1162.5
+  context.fillStyle = '#e8e1ec'
+  context.fillRect(photoX, photoY, photoWidth, photoHeight)
+  drawCoverAt(context, mainImage, photoX, photoY, photoWidth, photoHeight)
+  context.strokeStyle = 'rgba(18,13,21,.1)'
+  context.lineWidth = 2
+  context.strokeRect(photoX, photoY, photoWidth, photoHeight)
+
+  const sourceY = 1221.5
+  const sourceHeight = 115
+  const sourceGap = 11.5
+  const sourceStartX = 42
+  const sourceAreaWidth = 916
+  const sourceWidth = (sourceAreaWidth - sourceGap * 6) / 7
+  const sourceImages = await Promise.all(COLOR_KEYS.map(async (key) => {
+    if (!day.photos?.[key]) return null
+    try { return await loadImageSource(day.photos[key]) } catch { return null }
+  }))
+
+  COLOR_KEYS.forEach((key, index) => {
+    const x = sourceStartX + index * (sourceWidth + sourceGap)
+    context.fillStyle = '#fffefa'
+    context.fillRect(x, sourceY, sourceWidth, sourceHeight)
+    context.strokeStyle = 'rgba(69,60,67,.2)'
+    context.lineWidth = 1.5
+    context.strokeRect(x, sourceY, sourceWidth, sourceHeight)
+    const innerX = x + 7
+    const innerY = sourceY + 7
+    const innerWidth = sourceWidth - 14
+    const innerHeight = sourceHeight - 22
+    context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
+    context.fillRect(innerX, innerY, innerWidth, innerHeight)
+    if (sourceImages[index]) drawCoverAt(context, sourceImages[index], innerX, innerY, innerWidth, innerHeight)
+    context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
+    context.fillRect(x, sourceY + sourceHeight - 8, sourceWidth, 8)
+  })
+
+  const caption = day.caption ?? fallbackCaption
+  const dateText = formatDate(day.date, lang, true)
+  context.textBaseline = 'middle'
+  context.fillStyle = '#241435'
+  context.font = '600 31px "Noto Sans TC", "Segoe UI", sans-serif'
+  const dateWidth = 180
+  context.fillText(fitCanvasText(context, caption, width - 100 - dateWidth), 50, 1393)
+  context.fillStyle = '#625c63'
+  context.font = '600 25px "Noto Sans TC", "Segoe UI", sans-serif'
+  context.textAlign = 'right'
+  context.fillText(dateText, 950, 1393)
+  context.textAlign = 'left'
+  return canvas.toDataURL('image/png')
 }
 
 function sampleSourcePhoto(image, point) {
@@ -563,7 +650,7 @@ function SettingsScreen({ lang, setLang, t }) {
   )
 }
 
-function RainbowModal({ day, lang, t, onClose, onSave, onShare, onCaptionChange, onCaptionCommit }) {
+function RainbowModal({ day, lang, t, exporting, onClose, onSave, onShare, onCaptionChange, onCaptionCommit }) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -582,16 +669,27 @@ function RainbowModal({ day, lang, t, onClose, onSave, onShare, onCaptionChange,
 
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
-  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions"><button className="lightbox-save" type="button" onClick={onSave}><Icon name="download" />{t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare}><Icon name="share" />{t.shareImage}</button></div></section></div>
+  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
 }
 
-function DevelopedCard({ day, lang, t, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
+function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
+  const [printComplete, setPrintComplete] = useState(false)
+
+  useEffect(() => {
+    setPrintComplete(false)
+    if (!day) return undefined
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const timer = window.setTimeout(() => setPrintComplete(true), reducedMotion ? 0 : 1850)
+    return () => window.clearTimeout(timer)
+  }, [day?.date])
+
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className="printer-stage" aria-label={t.developedTitle}><div className="photo-printer" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div>
-    <div className="result-actions"><button className="save-card-action" type="button" onClick={onSave}><Icon name="download" />{t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare}><Icon name="share" />{t.shareImage}</button></div>
+    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><div className="printer-shell printer-shell-top" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="printer-shell printer-shell-bottom" aria-hidden="true" /></div>
+    <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
+    <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
     <div className="share-targets" aria-label={t.shareTargets}><span>LINE</span><span>IG STORY</span><span>THREADS</span></div>
     <button className="result-done" type="button" onClick={onDone}>{t.backToToday}</button>
   </section></div>
@@ -612,6 +710,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [developedDay, setDevelopedDay] = useState(null)
   const [message, setMessage] = useState('')
   const messageTimer = useRef(null)
@@ -740,33 +839,42 @@ export default function App() {
     finally { setFinishing(false) }
   }
 
-  function saveRainbowCard(target) {
-    if (!target?.cardImage) return
+  function downloadPolaroid(dataUrl, target) {
     const link = document.createElement('a')
-    link.href = target.cardImage
-    link.download = `niji-rainbow-${target.date}.jpg`
+    link.href = dataUrl
+    link.download = `niji-polaroid-${target.date}.png`
     link.click()
-    showMessage(t.imageSaved)
+  }
+
+  async function saveRainbowCard(target) {
+    if (!target?.cardImage) return
+    setExporting(true)
+    try {
+      const polaroidImage = await renderPolaroidImage(target, lang, t.defaultCaption)
+      downloadPolaroid(polaroidImage, target)
+      showMessage(t.imageSaved)
+    } catch { showMessage(t.error) }
+    finally { setExporting(false) }
   }
 
   async function shareRainbowCard(target) {
     if (!target?.cardImage) return
-    const filename = `niji-rainbow-${target.date}.jpg`
-    const file = dataUrlToFile(target.cardImage, filename)
+    setExporting(true)
     try {
+      const polaroidImage = await renderPolaroidImage(target, lang, t.defaultCaption)
+      const filename = `niji-polaroid-${target.date}.png`
+      const file = dataUrlToFile(polaroidImage, filename)
       if (file && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: t.shareTitle, text: target.caption ?? t.defaultCaption })
         showMessage(t.shared)
-      } else if (navigator.share) {
-        await navigator.share({ title: t.shareTitle, text: target.caption ?? t.defaultCaption, url: location.href })
-        showMessage(t.shared)
       } else {
-        saveRainbowCard(target)
+        downloadPolaroid(polaroidImage, target)
         showMessage(t.shareFallback)
       }
     } catch (error) {
       if (error?.name !== 'AbortError') showMessage(t.shareError)
     }
+    finally { setExporting(false) }
   }
 
   function updateDayCaption(targetDate, caption) {
@@ -818,7 +926,7 @@ export default function App() {
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
-    <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
-    <DevelopedCard day={developedDay} lang={lang} t={t} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
+    <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
+    <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
   </div>
 }
