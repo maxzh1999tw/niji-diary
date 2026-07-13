@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { analyzePixels, COLOR_KEYS } from './colorAnalysis.js'
+import { analyzeRegion, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
 import { getCompletedDays, getDay, saveDay } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
 const TAB_KEYS = ['today', 'archive', 'settings']
+const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
+const QA_MODE = import.meta.env.DEV ? new URLSearchParams(location.search).get('qa') : null
 
 function Icon({ name, size = 24 }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
@@ -28,6 +30,14 @@ function formatDate(date, lang, compact = false) {
   return new Intl.DateTimeFormat(locale, compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00`))
 }
 
+function resetAppViewport() {
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0)
+    const environment = document.querySelector('.app-environment')
+    if (environment) environment.scrollTop = 0
+  })
+}
+
 async function processPhoto(file) {
   const image = await decodePhoto(file)
   const maxSide = 1400
@@ -44,7 +54,7 @@ async function processPhoto(file) {
   const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true })
   sampleContext.drawImage(image, 0, 0, 72, 72)
   const pixels = sampleContext.getImageData(0, 0, 72, 72).data
-  const analysis = analyzePixels(pixels)
+  const analysis = analyzeRegion(pixels, 72, 72)
   image.close?.()
   return { image: canvas.toDataURL('image/jpeg', 0.84), ...analysis }
 }
@@ -64,17 +74,92 @@ async function decodePhoto(file) {
   }
 }
 
-function RainbowStrip({ photos, labels, interactive = false, onSelect }) {
+function loadImageSource(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Unable to load image'))
+    image.src = source
+  })
+}
+
+function drawCover(context, image, width, height) {
+  const imageRatio = image.width / image.height
+  const targetRatio = width / height
+  let sourceX = 0, sourceY = 0, sourceWidth = image.width, sourceHeight = image.height
+  if (imageRatio > targetRatio) {
+    sourceWidth = image.height * targetRatio
+    sourceX = (image.width - sourceWidth) / 2
+  } else {
+    sourceHeight = image.width / targetRatio
+    sourceY = (image.height - sourceHeight) / 2
+  }
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height)
+}
+
+function sampleDisplayedPhoto(image, point) {
+  const width = 160, height = 200
+  const canvas = document.createElement('canvas')
+  canvas.width = width; canvas.height = height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  drawCover(context, image, width, height)
+  return analyzeRegion(context.getImageData(0, 0, width, height).data, width, height, point, 0.045)
+}
+
+async function renderComposite(background, samples, transform) {
+  const image = await loadImageSource(background)
+  const canvas = document.createElement('canvas')
+  canvas.width = 1200; canvas.height = 1500
+  const context = canvas.getContext('2d', { alpha: false })
+  drawCover(context, image, canvas.width, canvas.height)
+  const centerX = canvas.width * transform.x / 100
+  const centerY = canvas.height * transform.y / 100
+  const radius = canvas.width * 0.32 * transform.scale
+  const band = radius * 0.12
+  context.save()
+  context.translate(centerX, centerY)
+  context.rotate(transform.rotation * Math.PI / 180)
+  context.lineCap = 'round'
+  context.shadowColor = 'rgba(20, 10, 35, .35)'
+  context.shadowBlur = radius * 0.025
+  context.shadowOffsetY = radius * 0.025
+  COLOR_KEYS.forEach((key, index) => {
+    context.beginPath()
+    context.arc(0, 0, radius - index * band, Math.PI, Math.PI * 2)
+    context.strokeStyle = samples[key] || FALLBACK_COLORS[key]
+    context.lineWidth = band + 2
+    context.stroke()
+  })
+  context.restore()
+  return canvas.toDataURL('image/jpeg', 0.88)
+}
+
+function EnergyStrip({ photos, samples = {}, labels, interactive = false, onSelect }) {
   return (
-    <div className="rainbow-strip" aria-label={interactive ? labels.join('、') : undefined}>
+    <div className="rainbow-strip energy-strip" aria-label={interactive ? labels.join('、') : undefined}>
       {COLOR_KEYS.map((key, index) => {
-        const content = photos[key] ? <img src={photos[key]} alt={labels[index]} loading="lazy" /> : <span>{index + 1}</span>
+        const style = photos[key] ? { background: samples[key] || FALLBACK_COLORS[key] } : undefined
+        const content = photos[key] ? <><Icon name="check" size={18} /><small>{labels[index]}</small></> : <span>{index + 1}</span>
         return interactive
-          ? <button type="button" key={key} className={`strip-${key}`} aria-label={labels[index]} onClick={() => onSelect(key)}>{content}</button>
-          : <div key={key} className={`strip-${key}`}>{content}</div>
+          ? <button type="button" key={key} style={style} className={`strip-${key}`} aria-label={labels[index]} onClick={() => onSelect(key)}>{content}</button>
+          : <div key={key} style={style} className={`strip-${key}`}>{content}</div>
       })}
     </div>
   )
+}
+
+function SourceThumbs({ photos, samples = {}, labels }) {
+  return <div className="source-thumbs" aria-label={labels.join('、')}>{COLOR_KEYS.map((key, index) => photos[key]
+    ? <div className="source-thumb" key={key} style={{ '--sample': samples[key] || FALLBACK_COLORS[key] }}><img src={photos[key]} alt={labels[index]} loading="lazy" /><span>{labels[index]}</span></div>
+    : null)}</div>
+}
+
+function RainbowArtwork({ samples, transform, onPointerDown, onPointerMove, onPointerUp }) {
+  const style = { left: `${transform.x}%`, top: `${transform.y}%`, transform: `translate(-50%, -50%) rotate(${transform.rotation}deg) scale(${transform.scale})` }
+  return <div className="rainbow-artwork" style={style} role="img" aria-label="Rainbow" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+    <svg viewBox="0 0 300 316" aria-hidden="true">{COLOR_KEYS.map((key, index) => { const radius = 132 - index * 16; return <path key={key} d={`M ${150 - radius} 158 A ${radius} ${radius} 0 0 1 ${150 + radius} 158`} stroke={samples[key] || FALLBACK_COLORS[key]} /> })}</svg>
+    <span className="drag-handle"><Icon name="sparkle" size={16} /></span>
+  </div>
 }
 
 function ColorWheel({ selected, labels, sampleColor, onSelect }) {
@@ -92,7 +177,7 @@ function ColorWheel({ selected, labels, sampleColor, onSelect }) {
   )
 }
 
-function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, onConfirm }) {
+function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, onConfirm, onResample }) {
   const selectedIndex = COLOR_KEYS.indexOf(selectedColor)
   const replacing = Boolean(photos[selectedColor])
   return (
@@ -104,7 +189,11 @@ function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, on
         <p>{t.wheelHint}</p>
       </div>
       <div className="capture-layout">
-        <div className="photo-preview"><img src={staged.image} alt={t.newPhotoAlt} /></div>
+        <button className="photo-preview sample-preview" type="button" onClick={onResample} aria-label={t.resamplePhoto}>
+          <img src={staged.image} alt={t.newPhotoAlt} />
+          <span className="sample-reticle" style={{ left: `${staged.samplePoint.x * 100}%`, top: `${staged.samplePoint.y * 100}%`, '--sample': staged.sampleColor }}><i /></span>
+          <small>{t.tapToSample}</small>
+        </button>
         <ColorWheel selected={selectedColor} labels={t.colors} sampleColor={staged.sampleColor} onSelect={onSelect} />
       </div>
       <div className="stage-actions">
@@ -115,8 +204,9 @@ function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, on
   )
 }
 
-function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, onComplete }) {
+function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, onStartCompose }) {
   const photos = day?.photos ?? {}
+  const samples = day?.samples ?? {}
   const isComplete = Boolean(day?.completedAt)
   return (
     <section className="today-screen screen-enter" aria-labelledby="today-title">
@@ -136,7 +226,7 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
 
       <div className="collection-panel">
         <div className="panel-title"><h2>{t.colorSlots}</h2><span>{count === 7 ? t.allFound : formatText(t.foundCount, { count })}</span></div>
-        {loading ? <div className="slot-loading" /> : <RainbowStrip photos={photos} labels={t.colors} interactive={!isComplete} onSelect={onRemove} />}
+        {loading ? <div className="slot-loading" /> : <EnergyStrip photos={photos} samples={samples} labels={t.colors} interactive={!isComplete} onSelect={onRemove} />}
         {!isComplete && count > 0 ? <p className="slot-hint">{t.tapToRemove}</p> : null}
       </div>
 
@@ -144,7 +234,7 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
         {isComplete ? (
           <div className="locked-message"><Icon name="lock" /><div><strong>{t.todayLocked}</strong><span>{t.comeBackTomorrow}</span></div></div>
         ) : count === 7 ? (
-          <button className="y2k-button finish" type="button" onClick={onComplete}><Icon name="sparkle" />{t.completeRainbow}</button>
+          <button className="y2k-button finish" type="button" onClick={onStartCompose}><Icon name="sparkle" />{t.createRainbowCard}</button>
         ) : (
           <label className="capture-button">
             <input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />
@@ -157,6 +247,53 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
   )
 }
 
+function ComposeScreen({ background, samples, transform, setTransform, t, onCapture, onBack, onFinish, finishing }) {
+  const dragState = useRef(null)
+
+  function startDrag(event) {
+    const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
+    if (!frame) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragState.current = { clientX: event.clientX, clientY: event.clientY, x: transform.x, y: transform.y, width: frame.width, height: frame.height }
+  }
+
+  function moveDrag(event) {
+    if (!dragState.current) return
+    const start = dragState.current
+    const x = Math.max(12, Math.min(88, start.x + (event.clientX - start.clientX) / start.width * 100))
+    const y = Math.max(18, Math.min(88, start.y + (event.clientY - start.clientY) / start.height * 100))
+    setTransform((current) => ({ ...current, x, y }))
+  }
+
+  function endDrag(event) {
+    if (dragState.current && event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    dragState.current = null
+  }
+
+  function updateValue(key, value) {
+    setTransform((current) => ({ ...current, [key]: Number(value) }))
+  }
+
+  return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
+    <button className="icon-button compose-back" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button>
+    <div className="compose-heading"><span className="chrome-kicker">RAINBOW STUDIO</span><h1 id="compose-title">{t.composeTitle}</h1><p>{background ? t.composeHint : t.backgroundHint}</p></div>
+    {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><label className="capture-button compact"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><span className="capture-lens"><Icon name="camera" /></span><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label></div> : <>
+      <div className="composer-layout">
+        <div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} /></div>
+        <div className="editor-controls">
+          <div className="control-head"><strong>{t.adjustRainbow}</strong><label className="replace-background"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />{t.retakeBackground}</label></div>
+          <label><span>{t.size}<output>{Math.round(transform.scale * 100)}%</output></span><input aria-label={t.size} type="range" min="0.55" max="1.35" step="0.01" value={transform.scale} onChange={(event) => updateValue('scale', event.target.value)} /></label>
+          <label><span>{t.rotation}<output>{Math.round(transform.rotation)}°</output></span><input aria-label={t.rotation} type="range" min="-35" max="35" step="1" value={transform.rotation} onChange={(event) => updateValue('rotation', event.target.value)} /></label>
+          <label><span>{t.horizontal}<output>{Math.round(transform.x)}%</output></span><input aria-label={t.horizontal} type="range" min="12" max="88" step="1" value={transform.x} onChange={(event) => updateValue('x', event.target.value)} /></label>
+          <label><span>{t.vertical}<output>{Math.round(transform.y)}%</output></span><input aria-label={t.vertical} type="range" min="18" max="88" step="1" value={transform.y} onChange={(event) => updateValue('y', event.target.value)} /></label>
+          <button className="y2k-button finish-card" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" />{finishing ? t.developing : t.finishCard}</button>
+        </div>
+      </div>
+    </>}
+  </section>
+}
+
 function ArchiveScreen({ history, lang, t, onOpen }) {
   return (
     <section className="archive-screen screen-enter" aria-labelledby="archive-title">
@@ -164,7 +301,8 @@ function ArchiveScreen({ history, lang, t, onOpen }) {
       {history.length ? <div className="archive-grid">{history.map((item, index) => (
         <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
           <span className="archive-number">#{String(history.length - index).padStart(3, '0')}</span>
-          <RainbowStrip photos={item.photos} labels={t.colors} />
+          <div className="polaroid-preview">{item.cardImage ? <img src={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} loading="lazy" /> : <EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />}</div>
+          <SourceThumbs photos={item.photos} samples={item.samples} labels={t.colors} />
           <span className="archive-date">{formatDate(item.date, lang, true)}</span>
         </button>
       ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
@@ -188,7 +326,7 @@ function SettingsScreen({ lang, setLang, t }) {
 
 function RainbowModal({ day, lang, t, onClose }) {
   if (!day) return null
-  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 id="modal-date">{formatDate(day.date, lang)}</h2><RainbowStrip photos={day.photos} labels={t.colors} /><p>{t.sevenMoments}</p></section></div>
+  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 id="modal-date">{formatDate(day.date, lang)}</h2><div className="modal-polaroid">{day.cardImage ? <img src={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} /> : <EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />}</div><SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} /><p>{t.sevenMoments}</p></section></div>
 }
 
 export default function App() {
@@ -199,8 +337,12 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState(null)
   const [staged, setStaged] = useState(null)
   const [selectedColor, setSelectedColor] = useState('red')
+  const [composing, setComposing] = useState(QA_MODE === 'compose')
+  const [background, setBackground] = useState(QA_MODE === 'compose' ? './rainbow.svg' : null)
+  const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0 })
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const [message, setMessage] = useState('')
   const messageTimer = useRef(null)
   const date = useMemo(localDateKey, [])
@@ -227,10 +369,17 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (QA_MODE) {
+      const qaPhotos = Object.fromEntries(COLOR_KEYS.map((key) => [key, './rainbow.svg']))
+      setDay({ schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, completedAt: null })
+      setHistory([])
+      setLoading(false)
+      return undefined
+    }
     let active = true
     Promise.all([getDay(date), getCompletedDays()]).then(([savedDay, savedHistory]) => {
       if (!active) return
-      setDay(savedDay ?? { schemaVersion: 1, date, photos: {}, completedAt: null })
+      setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : { schemaVersion: 2, date, photos: {}, samples: {}, completedAt: null })
       setHistory(savedHistory)
     }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) setLoading(false) })
     return () => { active = false; clearTimeout(messageTimer.current) }
@@ -238,8 +387,10 @@ export default function App() {
 
   function navigate(tab) {
     setStaged(null)
+    setComposing(false)
     setActiveTab(tab)
     location.hash = tab
+    resetAppViewport()
   }
 
   async function handleCapture(file, input) {
@@ -256,31 +407,81 @@ export default function App() {
 
   async function confirmColor() {
     if (!staged) return
-    const nextDay = { ...day, photos: { ...photos, [selectedColor]: staged.image } }
+    const nextDay = { ...day, schemaVersion: 2, photos: { ...photos, [selectedColor]: staged.image }, samples: { ...(day.samples ?? {}), [selectedColor]: staged.sampleColor } }
     setDay(nextDay)
     setStaged(null)
     navigator.vibrate?.([25, 35, 25])
     showMessage(formatText(t.colorAdded, { color: t.colors[COLOR_KEYS.indexOf(selectedColor)] }))
     try { await saveDay(nextDay) } catch { showMessage(t.error) }
+    if (COLOR_KEYS.every((key) => nextDay.photos[key])) {
+      setComposing(true)
+      resetAppViewport()
+    }
+  }
+
+  function resamplePhoto(event) {
+    const image = event.currentTarget.querySelector('img')
+    const rect = event.currentTarget.getBoundingClientRect()
+    if (!image || !rect.width || !rect.height) return
+    const point = {
+      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+    }
+    const analysis = sampleDisplayedPhoto(image, point)
+    setStaged((current) => ({ ...current, ...analysis }))
+    setSelectedColor(analysis.suggestedKey)
+    navigator.vibrate?.(20)
   }
 
   async function removeColor(key) {
     if (!photos[key] || day?.completedAt) return
     if (!window.confirm(formatText(t.removeConfirm, { color: t.colors[COLOR_KEYS.indexOf(key)] }))) return
     const nextPhotos = { ...photos }; delete nextPhotos[key]
-    const nextDay = { ...day, photos: nextPhotos }
+    const nextSamples = { ...(day.samples ?? {}) }; delete nextSamples[key]
+    const nextDay = { ...day, photos: nextPhotos, samples: nextSamples }
     setDay(nextDay)
     try { await saveDay(nextDay) } catch { showMessage(t.error) }
   }
 
-  async function completeRainbow() {
-    if (count !== 7 || day?.completedAt || !window.confirm(t.completeConfirm)) return
-    const completedDay = { ...day, completedAt: new Date().toISOString() }
-    setDay(completedDay)
-    setHistory((current) => [completedDay, ...current.filter((item) => item.date !== date)])
-    navigator.vibrate?.([50, 50, 100])
-    showMessage(t.rainbowCompleteToast)
-    try { await saveDay(completedDay) } catch { showMessage(t.error) }
+  async function handleBackground(file, input) {
+    if (!file) return
+    setProcessing(true)
+    try {
+      const result = await processPhoto(file)
+      setBackground(result.image)
+      navigator.vibrate?.(30)
+    } catch { showMessage(t.photoError) }
+    finally { setProcessing(false); if (input) input.value = '' }
+  }
+
+  async function finishRainbowCard() {
+    if (!background || finishing || count !== 7 || day?.completedAt) return
+    setFinishing(true)
+    try {
+      const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
+      const completedDay = { ...day, schemaVersion: 2, cardImage, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      setDay(completedDay)
+      setHistory((current) => [completedDay, ...current.filter((item) => item.date !== date)])
+      setComposing(false)
+      setBackground(null)
+      navigator.vibrate?.([50, 50, 100])
+      showMessage(t.rainbowCompleteToast)
+      resetAppViewport()
+      await saveDay(completedDay)
+    } catch { showMessage(t.error) }
+    finally { setFinishing(false) }
+  }
+
+  function startCompose() {
+    if (count === 7 && !day?.completedAt) {
+      setComposing(true)
+      resetAppViewport()
+    }
+  }
+
+  function exitCompose() {
+    setComposing(false)
+    resetAppViewport()
   }
 
   const screen = activeTab === 'archive'
@@ -288,8 +489,10 @@ export default function App() {
     : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} />
       : staged
-        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => setStaged(null)} onConfirm={confirmColor} />
-        : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} onCapture={handleCapture} onRemove={removeColor} onComplete={completeRainbow} />
+        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => setStaged(null)} onConfirm={confirmColor} onResample={resamplePhoto} />
+        : composing
+          ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} t={t} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
+          : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   return <div className="app-environment">
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />

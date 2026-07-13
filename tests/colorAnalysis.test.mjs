@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { analyzePixels } from '../src/colorAnalysis.js'
+import { analyzePixels, analyzeRegion } from '../src/colorAnalysis.js'
 
 const samples = {
   red: [220, 35, 55],
@@ -17,3 +17,17 @@ for (const [expected, rgb] of Object.entries(samples)) {
 }
 
 console.log('Color analysis: all seven rainbow colors detected correctly.')
+
+const width = 20, height = 20
+const image = new Uint8ClampedArray(width * height * 4)
+for (let y = 0; y < height; y++) {
+  for (let x = 0; x < width; x++) {
+    const index = (y * width + x) * 4
+    const center = x >= 7 && x <= 12 && y >= 7 && y <= 12
+    image.set(center ? [220, 35, 55, 255] : [30, 135, 220, 255], index)
+  }
+}
+
+assert.equal(analyzeRegion(image, width, height, { x: 0.5, y: 0.5 }, 0.14).suggestedKey, 'red')
+assert.equal(analyzeRegion(image, width, height, { x: 0.1, y: 0.1 }, 0.08).suggestedKey, 'blue')
+console.log('Region sampling: center and tapped positions detected correctly.')

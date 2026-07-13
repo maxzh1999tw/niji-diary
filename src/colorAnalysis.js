@@ -57,3 +57,30 @@ export function analyzePixels(pixels, stride = 16) {
     confidence: scoreTotal ? Math.round((bestScore / scoreTotal) * 100) : 14,
   }
 }
+
+export function analyzeRegion(imageData, width, height, point = { x: 0.5, y: 0.5 }, radiusRatio = 0.12) {
+  const centerX = Math.round(point.x * (width - 1))
+  const centerY = Math.round(point.y * (height - 1))
+  const radius = Math.max(2, Math.round(Math.min(width, height) * radiusRatio))
+  const selected = []
+  let red = 0, green = 0, blue = 0, totalWeight = 0
+
+  for (let y = Math.max(0, centerY - radius); y <= Math.min(height - 1, centerY + radius); y++) {
+    for (let x = Math.max(0, centerX - radius); x <= Math.min(width - 1, centerX + radius); x++) {
+      const distance = Math.hypot(x - centerX, y - centerY)
+      if (distance > radius) continue
+      const index = (y * width + x) * 4
+      const weight = Math.max(0.15, 1 - distance / (radius + 1))
+      const r = imageData[index], g = imageData[index + 1], b = imageData[index + 2]
+      selected.push(r, g, b, 255)
+      red += r * weight; green += g * weight; blue += b * weight; totalWeight += weight
+    }
+  }
+
+  const analysis = analyzePixels(new Uint8ClampedArray(selected), 4)
+  return {
+    ...analysis,
+    sampleColor: `rgb(${Math.round(red / totalWeight)}, ${Math.round(green / totalWeight)}, ${Math.round(blue / totalWeight)})`,
+    samplePoint: point,
+  }
+}
