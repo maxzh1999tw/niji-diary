@@ -13,6 +13,10 @@ function Icon({ name, size = 24 }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
   if (name === 'camera') return <svg {...common}><path d="M14.5 5 13 3H7L5.5 5H3a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-6.5Z" /><circle cx="10" cy="12" r="4" /></svg>
   if (name === 'upload') return <svg {...common}><path d="M12 16V3" /><path d="m7 8 5-5 5 5" /><path d="M5 13H3v8h18v-8h-2" /></svg>
+  if (name === 'opacity') return <svg {...common}><path d="M12 3s6 6.1 6 11a6 6 0 0 1-12 0c0-4.9 6-11 6-11Z" /><path d="M8.5 15.5a3.5 3.5 0 0 0 7 0" /></svg>
+  if (name === 'radius') return <svg {...common}><path d="M4 18A10 10 0 0 1 20 18" /><path d="M12 18V8" /><path d="m9 11 3-3 3 3" /></svg>
+  if (name === 'width') return <svg {...common}><path d="M4 8h16" /><path d="M4 16h16" /><path d="M8 5v6" /><path d="M16 13v6" /></svg>
+  if (name === 'angle') return <svg {...common}><path d="M5 19 12 5l7 14" /><path d="M8.5 12a7 7 0 0 0 7 0" /></svg>
   if (name === 'book') return <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
@@ -171,7 +175,7 @@ async function renderComposite(background, samples, transform) {
 
   context.save()
   context.globalAlpha = visibleOpacity
-  context.globalCompositeOperation = 'screen'
+  context.globalCompositeOperation = 'source-over'
   context.drawImage(rainbowLayer, 0, 0)
   context.restore()
   return canvas.toDataURL('image/jpeg', 0.88)
@@ -405,6 +409,7 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
 }
 
 function ComposeScreen({ background, samples, transform, setTransform, t, onCapture, onBack, onFinish, finishing }) {
+  const [activeTool, setActiveTool] = useState('transparency')
   const pointers = useRef(new Map())
   const gesture = useRef(null)
   const liveTransform = useRef(transform)
@@ -486,24 +491,22 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     setTransform(next)
   }
 
+  const editorTools = [
+    { key: 'transparency', icon: 'opacity', label: t.toolTransparency, title: t.transparency, min: 0, max: 1, step: 0.01, value: transform.transparency ?? 0, output: `${Math.round((transform.transparency ?? 0) * 100)}%` },
+    { key: 'radius', icon: 'radius', label: t.toolRadius, title: t.rainbowRadius, min: 0.55, max: 15, step: 0.05, value: transform.radius ?? 1, output: `${Math.round((transform.radius ?? 1) * 100)}%` },
+    { key: 'angle', icon: 'angle', label: t.toolAngle, title: t.rainbowAngle, min: 10, max: 180, step: 1, value: transform.angle ?? 180, output: `${Math.round(transform.angle ?? 180)}°` },
+  ]
+  const activeControl = editorTools.find((tool) => tool.key === activeTool) ?? editorTools[0]
+
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
-    <button className="icon-button compose-back" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button>
-    <div className="compose-heading"><span className="chrome-kicker">RAINBOW STUDIO</span><h1 id="compose-title">{t.composeTitle}</h1><p>{background ? t.composeHint : t.backgroundHint}</p></div>
-    {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <>
-      <div className="composer-layout">
-        <div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /></div>
-        <div className="editor-controls">
-          <div className="control-head"><strong>{t.adjustRainbow}</strong><div className="replace-background-actions"><label className="replace-background"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={16} />{t.retakeBackground}</label><label className="replace-background upload"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={16} />{t.uploadBackground}</label></div></div>
-          <div className="gesture-guide"><span className="gesture-orbit" aria-hidden="true"><i /><i /></span><p><strong>{t.gestureOnly}</strong><small>{t.gestureHint}</small></p></div>
-          <label className="rainbow-control"><span>{t.transparency}<output>{Math.round((transform.transparency ?? 0) * 100)}%</output></span><input aria-label={t.transparency} type="range" min="0" max="1" step="0.01" value={transform.transparency ?? 0} onChange={(event) => setTransform((current) => ({ ...current, transparency: Number(event.target.value) }))} /></label>
-          <label className="rainbow-control"><span>{t.rainbowRadius}<output>{Math.round((transform.radius ?? 1) * 100)}%</output></span><input aria-label={t.rainbowRadius} type="range" min="0.55" max="15" step="0.05" value={transform.radius ?? 1} onChange={(event) => setTransform((current) => ({ ...current, radius: Number(event.target.value) }))} /></label>
-          <label className="rainbow-control"><span>{t.colorWidth}<output>{Math.round((transform.colorWidth ?? 1) * 100)}%</output></span><input aria-label={t.colorWidth} type="range" min="0.35" max="1.8" step="0.01" value={transform.colorWidth ?? 1} onChange={(event) => setTransform((current) => ({ ...current, colorWidth: Number(event.target.value) }))} /></label>
-          <label className="rainbow-control"><span>{t.rainbowAngle}<output>{Math.round(transform.angle ?? 180)}°</output></span><input aria-label={t.rainbowAngle} type="range" min="10" max="180" step="1" value={transform.angle ?? 180} onChange={(event) => setTransform((current) => ({ ...current, angle: Number(event.target.value) }))} /></label>
-          <button className="reset-rainbow" type="button" onClick={resetRainbow}><Icon name="reset" />{t.resetRainbow}</button>
-          <button className="y2k-button finish-card" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" />{finishing ? t.developing : t.finishCard}</button>
-        </div>
+    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button> : <i aria-hidden="true" />}</header>
+    {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
+      <div className="canvas-stage"><div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div>
+      <div className="editor-dock">
+        <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => setTransform((current) => ({ ...current, [activeControl.key]: Number(event.target.value) }))} /></label>
+        <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={activeTool === tool.key ? 'active' : ''} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}<button className="toolbar-reset" type="button" onClick={resetRainbow}><Icon name="reset" size={21} /><span>{t.resetShort}</span></button></div>
       </div>
-    </>}
+    </div>}
   </section>
 }
 
@@ -703,13 +706,15 @@ export default function App() {
           ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} t={t} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
+  const immersiveEditor = activeTab === 'today' && composing && !staged
+
   return <div className="app-environment">
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />
-    <div className="app-shell">
+    <div className={`app-shell ${immersiveEditor ? 'immersive-editor' : ''}`}>
       <a className="skip-link" href="#app-content">{t.skip}</a>
-      <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button><div className="online-pill"><i />{t.localMode}</div></header>
+      {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button><div className="online-pill"><i />{t.localMode}</div></header> : null}
       <main id="app-content" className="app-content" tabIndex="-1">{screen}</main>
-      <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav>
+      {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
