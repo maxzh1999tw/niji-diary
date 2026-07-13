@@ -17,6 +17,8 @@ function Icon({ name, size = 24 }) {
   if (name === 'radius') return <svg {...common}><path d="M4 18A10 10 0 0 1 20 18" /><path d="M12 18V8" /><path d="m9 11 3-3 3 3" /></svg>
   if (name === 'width') return <svg {...common}><path d="M4 8h16" /><path d="M4 16h16" /><path d="M8 5v6" /><path d="M16 13v6" /></svg>
   if (name === 'angle') return <svg {...common}><path d="M5 19 12 5l7 14" /><path d="M8.5 12a7 7 0 0 0 7 0" /></svg>
+  if (name === 'download') return <svg {...common}><path d="M12 3v13" /><path d="m7 11 5 5 5-5" /><path d="M4 21h16" /></svg>
+  if (name === 'share') return <svg {...common}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.4" /><path d="m8.7 13.3 6.6 4.4" /></svg>
   if (name === 'book') return <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
@@ -82,6 +84,16 @@ function loadImageSource(source) {
     image.onerror = () => reject(new Error('Unable to load image'))
     image.src = source
   })
+}
+
+function dataUrlToFile(dataUrl, filename) {
+  if (!dataUrl?.startsWith('data:')) return null
+  const [header, encoded] = dataUrl.split(',')
+  const type = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg'
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return new File([bytes], filename, { type })
 }
 
 function drawCover(context, image, width, height) {
@@ -517,7 +529,7 @@ function ArchiveScreen({ history, lang, t, onOpen }) {
       {history.length ? <div className="archive-grid">{history.map((item, index) => (
         <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
           <span className="archive-number">#{String(history.length - index).padStart(3, '0')}</span>
-          <div className="polaroid-preview">{item.cardImage ? <img src={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} loading="lazy" /> : <EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />}</div>
+          <div className="polaroid-preview">{item.cardImage ? <img src={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} loading="lazy" /> : <EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />}<span>{item.caption ?? t.defaultCaption}</span></div>
           <SourceThumbs photos={item.photos} samples={item.samples} labels={t.colors} />
           <span className="archive-date">{formatDate(item.date, lang, true)}</span>
         </button>
@@ -540,9 +552,28 @@ function SettingsScreen({ lang, setLang, t }) {
   )
 }
 
-function RainbowModal({ day, lang, t, onClose }) {
+function CaptionEditor({ value, t, onChange, onCommit }) {
+  return <label className="caption-editor"><span>{t.captionLabel}</span><input type="text" maxLength="60" value={value} onChange={(event) => onChange(event.target.value)} onBlur={onCommit} /></label>
+}
+
+function RainbowModal({ day, lang, t, onClose, onCaptionChange, onCaptionCommit }) {
   if (!day) return null
-  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 id="modal-date">{formatDate(day.date, lang)}</h2><div className="modal-polaroid">{day.cardImage ? <img src={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} /> : <EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />}</div><SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} /><p>{t.sevenMoments}</p></section></div>
+  const caption = day.caption ?? t.defaultCaption
+  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 id="modal-date">{formatDate(day.date, lang)}</h2><div className="modal-polaroid">{day.cardImage ? <img src={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} /> : <EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />}<span>{caption}</span></div><SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} /><CaptionEditor value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></section></div>
+}
+
+function DevelopedCard({ day, t, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
+  if (!day) return null
+  const caption = day.caption ?? t.defaultCaption
+  return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
+    <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
+    <div className="printer-stage" aria-label={t.developedTitle}><div className="photo-printer" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><div className="printed-polaroid"><div className="printed-photo"><img src={day.cardImage} alt={t.developedAlt} /><i aria-hidden="true" /></div><span>{caption}</span></div></div>
+    <SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} />
+    <CaptionEditor value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} />
+    <div className="result-actions"><button className="save-card-action" type="button" onClick={onSave}><Icon name="download" />{t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare}><Icon name="share" />{t.shareImage}</button></div>
+    <div className="share-targets" aria-label={t.shareTargets}><span>LINE</span><span>IG STORY</span><span>THREADS</span></div>
+    <button className="result-done" type="button" onClick={onDone}>{t.backToToday}</button>
+  </section></div>
 }
 
 export default function App() {
@@ -560,6 +591,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [developedDay, setDevelopedDay] = useState(null)
   const [message, setMessage] = useState('')
   const messageTimer = useRef(null)
   const date = useMemo(localDateKey, [])
@@ -588,8 +620,10 @@ export default function App() {
   useEffect(() => {
     if (QA_MODE) {
       const qaPhotos = Object.fromEntries(COLOR_KEYS.map((key) => [key, './rainbow.svg']))
-      setDay({ schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, completedAt: null })
-      setHistory([])
+      const qaDay = { schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, cardImage: QA_MODE === 'result' ? './rainbow.svg' : undefined, completedAt: QA_MODE === 'result' ? new Date().toISOString() : null }
+      setDay(qaDay)
+      if (QA_MODE === 'result') setDevelopedDay(qaDay)
+      setHistory(QA_MODE === 'result' ? [qaDay] : [])
       setLoading(false)
       return undefined
     }
@@ -671,9 +705,10 @@ export default function App() {
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const completedDay = { ...day, schemaVersion: 2, cardImage, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const completedDay = { ...day, schemaVersion: 2, cardImage, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
       setDay(completedDay)
       setHistory((current) => [completedDay, ...current.filter((item) => item.date !== date)])
+      setDevelopedDay(completedDay)
       setComposing(false)
       setBackground(null)
       navigator.vibrate?.([50, 50, 100])
@@ -682,6 +717,49 @@ export default function App() {
       await saveDay(completedDay)
     } catch { showMessage(t.error) }
     finally { setFinishing(false) }
+  }
+
+  function saveDevelopedCard() {
+    if (!developedDay?.cardImage) return
+    const link = document.createElement('a')
+    link.href = developedDay.cardImage
+    link.download = `niji-rainbow-${developedDay.date}.jpg`
+    link.click()
+    showMessage(t.imageSaved)
+  }
+
+  async function shareDevelopedCard() {
+    if (!developedDay?.cardImage) return
+    const filename = `niji-rainbow-${developedDay.date}.jpg`
+    const file = dataUrlToFile(developedDay.cardImage, filename)
+    try {
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: t.shareTitle, text: developedDay.caption ?? t.defaultCaption })
+        showMessage(t.shared)
+      } else if (navigator.share) {
+        await navigator.share({ title: t.shareTitle, text: developedDay.caption ?? t.defaultCaption, url: location.href })
+        showMessage(t.shared)
+      } else {
+        saveDevelopedCard()
+        showMessage(t.shareFallback)
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') showMessage(t.shareError)
+    }
+  }
+
+  function updateDayCaption(targetDate, caption) {
+    const update = (item) => item?.date === targetDate ? { ...item, caption } : item
+    setDay((current) => update(current))
+    setHistory((current) => current.map(update))
+    setSelectedDay((current) => update(current))
+    setDevelopedDay((current) => update(current))
+  }
+
+  async function persistCaption(target) {
+    if (!target) return
+    try { await saveDay(target); showMessage(t.captionSaved) }
+    catch { showMessage(t.error) }
   }
 
   function startCompose() {
@@ -719,6 +797,7 @@ export default function App() {
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
-    <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} />
+    <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
+    <DevelopedCard day={developedDay} t={t} onSave={saveDevelopedCard} onShare={shareDevelopedCard} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
   </div>
 }
