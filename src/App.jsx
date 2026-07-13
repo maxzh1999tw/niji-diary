@@ -626,12 +626,14 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
 function ArchiveScreen({ history, lang, t, onOpen }) {
   return (
     <section className="archive-screen screen-enter" aria-labelledby="archive-title">
-      <div className="screen-title"><span className="chrome-kicker">RAINBOW LOG</span><h1 id="archive-title">{t.archiveTitle}</h1><p>{formatText(t.rainbowCount, { count: history.length })}</p></div>
-      {history.length ? <div className="archive-grid">{history.map((item) => (
-        <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
-          <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
-        </button>
-      ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
+      <div className="screen-title"><span className="chrome-kicker">POLAROID ALBUM</span><h1 id="archive-title">{t.archiveTitle}</h1><p>{formatText(t.rainbowCount, { count: history.length })}</p></div>
+      <div className="archive-scroll-region" role="region" aria-label={t.albumListLabel} tabIndex={0}>
+        {history.length ? <div className="archive-grid">{history.map((item) => (
+          <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
+            <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+          </button>
+        ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
+      </div>
     </section>
   )
 }
@@ -743,10 +745,12 @@ export default function App() {
   useEffect(() => {
     if (QA_MODE) {
       const qaPhotos = Object.fromEntries(COLOR_KEYS.map((key) => [key, './rainbow.svg']))
-      const qaDay = { schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, cardImage: QA_MODE === 'result' ? './rainbow.svg' : undefined, completedAt: QA_MODE === 'result' ? new Date().toISOString() : null }
+      const qaCompleted = QA_MODE === 'result' || QA_MODE === 'album'
+      const qaDay = { schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, cardImage: qaCompleted ? './rainbow.svg' : undefined, completedAt: qaCompleted ? new Date().toISOString() : null }
+      const qaAlbum = QA_MODE === 'album' ? Array.from({ length: 12 }, (_, index) => ({ ...qaDay, date: `2026-07-${String(13 - index).padStart(2, '0')}` })) : []
       setDay(qaDay)
       if (QA_MODE === 'result') setDevelopedDay(qaDay)
-      setHistory(QA_MODE === 'result' ? [qaDay] : [])
+      setHistory(QA_MODE === 'album' ? qaAlbum : QA_MODE === 'result' ? [qaDay] : [])
       setLoading(false)
       return undefined
     }
@@ -922,7 +926,7 @@ export default function App() {
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />
     <div className={`app-shell ${immersiveEditor ? 'immersive-editor' : ''}`}>
       <a className="skip-link" href="#app-content">{t.skip}</a>
-      {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button><div className="online-pill"><i />{t.localMode}</div></header> : null}
+      {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button></header> : null}
       <main id="app-content" className="app-content" tabIndex="-1">{screen}</main>
       {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}
