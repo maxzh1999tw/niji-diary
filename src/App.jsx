@@ -16,6 +16,7 @@ function Icon({ name, size = 24 }) {
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
   if (name === 'back') return <svg {...common}><path d="m15 18-6-6 6-6" /></svg>
+  if (name === 'reset') return <svg {...common}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
   if (name === 'check') return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>
   if (name === 'lock') return <svg {...common}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
   return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>
@@ -116,20 +117,30 @@ async function renderComposite(background, samples, transform) {
   const centerY = canvas.height * transform.y / 100
   const radius = canvas.width * 0.32 * transform.scale
   const band = radius * 0.12
+  const rainbowOpacity = transform.opacity ?? 0.8
   context.save()
   context.translate(centerX, centerY)
   context.rotate(transform.rotation * Math.PI / 180)
   context.lineCap = 'round'
-  context.shadowColor = 'rgba(20, 10, 35, .35)'
-  context.shadowBlur = radius * 0.025
-  context.shadowOffsetY = radius * 0.025
-  COLOR_KEYS.forEach((key, index) => {
-    context.beginPath()
-    context.arc(0, 0, radius - index * band, Math.PI, Math.PI * 2)
-    context.strokeStyle = samples[key] || FALLBACK_COLORS[key]
-    context.lineWidth = band + 2
-    context.stroke()
-  })
+  context.globalCompositeOperation = 'screen'
+
+  const drawLightBands = ({ alpha, width, blur }) => {
+    context.globalAlpha = alpha
+    context.filter = `blur(${Math.max(0, blur)}px) saturate(135%) brightness(118%)`
+    COLOR_KEYS.forEach((key, index) => {
+      context.beginPath()
+      context.arc(0, 0, radius - index * band, Math.PI, Math.PI * 2)
+      context.strokeStyle = samples[key] || FALLBACK_COLORS[key]
+      context.lineWidth = band * width
+      context.stroke()
+    })
+  }
+
+  drawLightBands({ alpha: 0.16 * rainbowOpacity, width: 1.8, blur: radius * 0.022 })
+  drawLightBands({ alpha: 0.52 * rainbowOpacity, width: 0.92, blur: radius * 0.004 })
+  context.filter = 'none'
+  context.globalAlpha = 1
+  context.globalCompositeOperation = 'source-over'
   context.restore()
   return canvas.toDataURL('image/jpeg', 0.88)
 }
@@ -154,11 +165,23 @@ function SourceThumbs({ photos, samples = {}, labels }) {
     : null)}</div>
 }
 
-function RainbowArtwork({ samples, transform, onPointerDown, onPointerMove, onPointerUp }) {
-  const style = { left: `${transform.x}%`, top: `${transform.y}%`, transform: `translate(-50%, -50%) rotate(${transform.rotation}deg) scale(${transform.scale})` }
-  return <div className="rainbow-artwork" style={style} role="img" aria-label="Rainbow" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
-    <svg viewBox="0 0 300 316" aria-hidden="true">{COLOR_KEYS.map((key, index) => { const radius = 132 - index * 16; return <path key={key} d={`M ${150 - radius} 158 A ${radius} ${radius} 0 0 1 ${150 + radius} 158`} stroke={samples[key] || FALLBACK_COLORS[key]} /> })}</svg>
-    <span className="drag-handle"><Icon name="sparkle" size={16} /></span>
+function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMove, onPointerUp, onWheel }) {
+  const style = { left: `${transform.x}%`, top: `${transform.y}%`, opacity: transform.opacity ?? 0.8, transform: `translate(-50%, -50%) rotate(${transform.rotation}deg) scale(${transform.scale})` }
+  const paths = COLOR_KEYS.map((key, index) => {
+    const radius = 132 - index * 16
+    return <path key={key} d={`M ${150 - radius} 158 A ${radius} ${radius} 0 0 1 ${150 + radius} 158`} stroke={samples[key] || FALLBACK_COLORS[key]} />
+  })
+  return <div className="rainbow-artwork" style={style} role="img" aria-label={label} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
+    <svg viewBox="0 0 300 316" aria-hidden="true">
+      <defs>
+        <linearGradient id="rainbow-end-fade"><stop offset="0" stopColor="white" stopOpacity="0" /><stop offset=".1" stopColor="white" /><stop offset=".9" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" /></linearGradient>
+        <mask id="rainbow-fade-mask"><rect width="300" height="316" fill="url(#rainbow-end-fade)" /></mask>
+        <filter id="rainbow-glow"><feGaussianBlur stdDeviation="6" /></filter>
+        <filter id="rainbow-soft"><feGaussianBlur stdDeviation=".7" /></filter>
+      </defs>
+      <g className="rainbow-glow" mask="url(#rainbow-fade-mask)" filter="url(#rainbow-glow)">{paths}</g>
+      <g className="rainbow-bands" mask="url(#rainbow-fade-mask)" filter="url(#rainbow-soft)">{paths}</g>
+    </svg>
   </div>
 }
 
@@ -330,31 +353,85 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
 }
 
 function ComposeScreen({ background, samples, transform, setTransform, t, onCapture, onBack, onFinish, finishing }) {
-  const dragState = useRef(null)
+  const pointers = useRef(new Map())
+  const gesture = useRef(null)
+  const liveTransform = useRef(transform)
+  liveTransform.current = transform
 
-  function startDrag(event) {
+  function beginGesture(event) {
     const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
     if (!frame) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
-    dragState.current = { clientX: event.clientX, clientY: event.clientY, x: transform.x, y: transform.y, width: frame.width, height: frame.height }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    restartGesture(frame)
   }
 
-  function moveDrag(event) {
-    if (!dragState.current) return
-    const start = dragState.current
-    const x = Math.max(12, Math.min(88, start.x + (event.clientX - start.clientX) / start.width * 100))
-    const y = Math.max(18, Math.min(88, start.y + (event.clientY - start.clientY) / start.height * 100))
-    setTransform((current) => ({ ...current, x, y }))
+  function restartGesture(frame) {
+    const points = [...pointers.current.values()]
+    if (points.length >= 2) {
+      const [a, b] = points
+      gesture.current = {
+        mode: 'pinch', frame, transform: liveTransform.current,
+        centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2,
+        distance: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x),
+      }
+    } else if (points.length === 1) {
+      gesture.current = { mode: 'pan', frame, transform: liveTransform.current, x: points[0].x, y: points[0].y }
+    } else gesture.current = null
   }
 
-  function endDrag(event) {
-    if (dragState.current && event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    dragState.current = null
+  function moveGesture(event) {
+    if (!pointers.current.has(event.pointerId) || !gesture.current) return
+    event.preventDefault()
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    const points = [...pointers.current.values()]
+    const start = gesture.current
+
+    if (start.mode === 'pinch' && points.length >= 2) {
+      const [a, b] = points
+      const centerX = (a.x + b.x) / 2
+      const centerY = (a.y + b.y) / 2
+      const distance = Math.hypot(b.x - a.x, b.y - a.y)
+      const angle = Math.atan2(b.y - a.y, b.x - a.x)
+      const next = {
+        ...start.transform,
+        x: start.transform.x + (centerX - start.centerX) / start.frame.width * 100,
+        y: start.transform.y + (centerY - start.centerY) / start.frame.height * 100,
+        scale: start.transform.scale * distance / Math.max(start.distance, Number.EPSILON),
+        rotation: start.transform.rotation + (angle - start.angle) * 180 / Math.PI,
+      }
+      liveTransform.current = next
+      setTransform(next)
+    } else if (start.mode === 'pan' && points.length === 1) {
+      const next = { ...start.transform, x: start.transform.x + (points[0].x - start.x) / start.frame.width * 100, y: start.transform.y + (points[0].y - start.y) / start.frame.height * 100 }
+      liveTransform.current = next
+      setTransform(next)
+    }
   }
 
-  function updateValue(key, value) {
-    setTransform((current) => ({ ...current, [key]: Number(value) }))
+  function endGesture(event) {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    pointers.current.delete(event.pointerId)
+    const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
+    if (frame) restartGesture(frame)
+  }
+
+  function zoomWithWheel(event) {
+    event.preventDefault()
+    const factor = Math.exp(-event.deltaY * 0.0015)
+    setTransform((current) => {
+      const next = { ...current, scale: current.scale * factor }
+      liveTransform.current = next
+      return next
+    })
+  }
+
+  function resetRainbow() {
+    const next = { x: 50, y: 58, scale: 1, rotation: 0, opacity: 0.8 }
+    liveTransform.current = next
+    setTransform(next)
   }
 
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
@@ -362,13 +439,12 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     <div className="compose-heading"><span className="chrome-kicker">RAINBOW STUDIO</span><h1 id="compose-title">{t.composeTitle}</h1><p>{background ? t.composeHint : t.backgroundHint}</p></div>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><label className="capture-button compact"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><span className="capture-lens"><Icon name="camera" /></span><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label></div> : <>
       <div className="composer-layout">
-        <div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} /></div>
+        <div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /></div>
         <div className="editor-controls">
           <div className="control-head"><strong>{t.adjustRainbow}</strong><label className="replace-background"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />{t.retakeBackground}</label></div>
-          <label><span>{t.size}<output>{Math.round(transform.scale * 100)}%</output></span><input aria-label={t.size} type="range" min="0.55" max="1.35" step="0.01" value={transform.scale} onChange={(event) => updateValue('scale', event.target.value)} /></label>
-          <label><span>{t.rotation}<output>{Math.round(transform.rotation)}°</output></span><input aria-label={t.rotation} type="range" min="-35" max="35" step="1" value={transform.rotation} onChange={(event) => updateValue('rotation', event.target.value)} /></label>
-          <label><span>{t.horizontal}<output>{Math.round(transform.x)}%</output></span><input aria-label={t.horizontal} type="range" min="12" max="88" step="1" value={transform.x} onChange={(event) => updateValue('x', event.target.value)} /></label>
-          <label><span>{t.vertical}<output>{Math.round(transform.y)}%</output></span><input aria-label={t.vertical} type="range" min="18" max="88" step="1" value={transform.y} onChange={(event) => updateValue('y', event.target.value)} /></label>
+          <div className="gesture-guide"><span className="gesture-orbit" aria-hidden="true"><i /><i /></span><p><strong>{t.gestureOnly}</strong><small>{t.gestureHint}</small></p></div>
+          <label className="opacity-control"><span>{t.opacity}<output>{Math.round((transform.opacity ?? 0.8) * 100)}%</output></span><input aria-label={t.opacity} type="range" min="0" max="1" step="0.01" value={transform.opacity ?? 0.8} onChange={(event) => setTransform((current) => ({ ...current, opacity: Number(event.target.value) }))} /></label>
+          <button className="reset-rainbow" type="button" onClick={resetRainbow}><Icon name="reset" />{t.resetRainbow}</button>
           <button className="y2k-button finish-card" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" />{finishing ? t.developing : t.finishCard}</button>
         </div>
       </div>
@@ -422,7 +498,7 @@ export default function App() {
   const [selectedColor, setSelectedColor] = useState('red')
   const [composing, setComposing] = useState(QA_MODE === 'compose')
   const [background, setBackground] = useState(QA_MODE === 'compose' ? './rainbow.svg' : null)
-  const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0 })
+  const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0, opacity: 0.8 })
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [finishing, setFinishing] = useState(false)
