@@ -12,6 +12,7 @@ const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey:
 function Icon({ name, size = 24 }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
   if (name === 'camera') return <svg {...common}><path d="M14.5 5 13 3H7L5.5 5H3a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-6.5Z" /><circle cx="10" cy="12" r="4" /></svg>
+  if (name === 'upload') return <svg {...common}><path d="M12 16V3" /><path d="m7 8 5-5 5 5" /><path d="M5 13H3v8h18v-8h-2" /></svg>
   if (name === 'book') return <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
@@ -119,6 +120,11 @@ async function renderComposite(background, samples, transform) {
   const outerRadius = baseRadius * (transform.radius ?? 1)
   const colorWidth = baseRadius * 0.075 * (transform.colorWidth ?? 1)
   const innerRadius = Math.max(2, outerRadius - colorWidth * COLOR_KEYS.length)
+  const angle = Math.max(10, Math.min(180, transform.angle ?? 180))
+  const angleRadians = angle * Math.PI / 180
+  const startAngle = -Math.PI / 2 - angleRadians / 2
+  const endAngle = -Math.PI / 2 + angleRadians / 2
+  const halfChord = Math.max(1, outerRadius * Math.sin(angleRadians / 2))
   const transparency = transform.transparency ?? (transform.opacity == null ? 0 : 1 - transform.opacity)
   const visibleOpacity = 1 - transparency
   const rainbowLayer = document.createElement('canvas')
@@ -139,8 +145,8 @@ async function renderComposite(background, samples, transform) {
     light.filter = `blur(${blur}px) saturate(165%) brightness(118%)`
     light.fillStyle = makeSpectrum()
     light.beginPath()
-    light.arc(0, 0, outerRadius, Math.PI, Math.PI * 2)
-    light.arc(0, 0, innerRadius, Math.PI * 2, Math.PI, true)
+    light.arc(0, 0, outerRadius, startAngle, endAngle)
+    light.arc(0, 0, innerRadius, endAngle, startAngle, true)
     light.closePath()
     light.fill()
   }
@@ -149,12 +155,12 @@ async function renderComposite(background, samples, transform) {
   light.translate(centerX, centerY)
   light.rotate(transform.rotation * Math.PI / 180)
   light.globalCompositeOperation = 'screen'
-  drawSpectrum(0.34, outerRadius * 0.035)
-  drawSpectrum(1, outerRadius * 0.006)
+  drawSpectrum(0.34, colorWidth * COLOR_KEYS.length * 0.18)
+  drawSpectrum(1, colorWidth * 0.08)
   light.filter = 'none'
   light.globalAlpha = 1
   light.globalCompositeOperation = 'destination-in'
-  const endFade = light.createLinearGradient(-outerRadius, 0, outerRadius, 0)
+  const endFade = light.createLinearGradient(-halfChord, 0, halfChord, 0)
   endFade.addColorStop(0, 'rgba(255,255,255,0)')
   endFade.addColorStop(0.1, 'white')
   endFade.addColorStop(0.9, 'white')
@@ -197,8 +203,18 @@ function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMov
   const outerRadius = 132 * (transform.radius ?? 1)
   const colorWidth = 12 * (transform.colorWidth ?? 1)
   const innerRadius = Math.max(2, outerRadius - colorWidth * COLOR_KEYS.length)
-  const arc = `M ${150 - outerRadius} 158 A ${outerRadius} ${outerRadius} 0 0 1 ${150 + outerRadius} 158 L ${150 + innerRadius} 158 A ${innerRadius} ${innerRadius} 0 0 0 ${150 - innerRadius} 158 Z`
+  const angle = Math.max(10, Math.min(180, transform.angle ?? 180))
+  const halfAngle = angle * Math.PI / 360
+  const startAngle = -Math.PI / 2 - halfAngle
+  const endAngle = -Math.PI / 2 + halfAngle
+  const point = (radius, radians) => ({ x: 150 + radius * Math.cos(radians), y: 158 + radius * Math.sin(radians) })
+  const outerStart = point(outerRadius, startAngle)
+  const outerEnd = point(outerRadius, endAngle)
+  const innerStart = point(innerRadius, startAngle)
+  const innerEnd = point(innerRadius, endAngle)
+  const arc = `M ${outerStart.x} ${outerStart.y} A ${outerRadius} ${outerRadius} 0 0 1 ${outerEnd.x} ${outerEnd.y} L ${innerEnd.x} ${innerEnd.y} A ${innerRadius} ${innerRadius} 0 0 0 ${innerStart.x} ${innerStart.y} Z`
   const innerRatio = innerRadius / outerRadius
+  const outerEdgeStart = innerRatio + (1 - innerRatio) * 0.985
   const spectrumStops = [...COLOR_KEYS].reverse().map((key, index) => <stop key={key} offset={innerRatio + (1 - innerRatio) * (index + 0.5) / COLOR_KEYS.length} stopColor={samples[key] || FALLBACK_COLORS[key]} />)
   return <div className="rainbow-artwork" style={style} role="img" aria-label={label} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
     <svg viewBox="0 0 300 316" aria-hidden="true">
@@ -207,11 +223,11 @@ function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMov
           <stop offset={Math.max(0, innerRatio - 0.012)} stopColor={samples.violet || FALLBACK_COLORS.violet} stopOpacity="0" />
           <stop offset={innerRatio} stopColor={samples.violet || FALLBACK_COLORS.violet} />
           {spectrumStops}
-          <stop offset=".988" stopColor={samples.red || FALLBACK_COLORS.red} />
+          <stop offset={outerEdgeStart} stopColor={samples.red || FALLBACK_COLORS.red} />
           <stop offset="1" stopColor={samples.red || FALLBACK_COLORS.red} stopOpacity="0" />
         </radialGradient>
-        <linearGradient id="rainbow-end-fade" gradientUnits="userSpaceOnUse" x1={150 - outerRadius} x2={150 + outerRadius}><stop offset="0" stopColor="white" stopOpacity="0" /><stop offset=".1" stopColor="white" /><stop offset=".9" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" /></linearGradient>
-        <mask id="rainbow-fade-mask"><rect x="-100" y="-20" width="500" height="360" fill="url(#rainbow-end-fade)" /></mask>
+        <linearGradient id="rainbow-end-fade" gradientUnits="userSpaceOnUse" x1={outerStart.x} y1={outerStart.y} x2={outerEnd.x} y2={outerEnd.y}><stop offset="0" stopColor="white" stopOpacity="0" /><stop offset=".1" stopColor="white" /><stop offset=".9" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" /></linearGradient>
+        <mask id="rainbow-fade-mask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x={150 - outerRadius * 1.25} y={158 - outerRadius * 1.25} width={outerRadius * 2.5} height={outerRadius * 2.5}><rect x={150 - outerRadius * 1.25} y={158 - outerRadius * 1.25} width={outerRadius * 2.5} height={outerRadius * 2.5} fill="url(#rainbow-end-fade)" /></mask>
         <filter id="rainbow-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" /><feColorMatrix type="saturate" values="1.55" /></filter>
         <filter id="rainbow-soft" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation=".9" /><feColorMatrix type="saturate" values="1.45" /></filter>
       </defs>
@@ -465,7 +481,7 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
   }
 
   function resetRainbow() {
-    const next = { x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1 }
+    const next = { x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1, angle: 180 }
     liveTransform.current = next
     setTransform(next)
   }
@@ -473,15 +489,16 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <button className="icon-button compose-back" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button>
     <div className="compose-heading"><span className="chrome-kicker">RAINBOW STUDIO</span><h1 id="compose-title">{t.composeTitle}</h1><p>{background ? t.composeHint : t.backgroundHint}</p></div>
-    {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><label className="capture-button compact"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><span className="capture-lens"><Icon name="camera" /></span><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label></div> : <>
+    {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <>
       <div className="composer-layout">
         <div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /></div>
         <div className="editor-controls">
-          <div className="control-head"><strong>{t.adjustRainbow}</strong><label className="replace-background"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />{t.retakeBackground}</label></div>
+          <div className="control-head"><strong>{t.adjustRainbow}</strong><div className="replace-background-actions"><label className="replace-background"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={16} />{t.retakeBackground}</label><label className="replace-background upload"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={16} />{t.uploadBackground}</label></div></div>
           <div className="gesture-guide"><span className="gesture-orbit" aria-hidden="true"><i /><i /></span><p><strong>{t.gestureOnly}</strong><small>{t.gestureHint}</small></p></div>
           <label className="rainbow-control"><span>{t.transparency}<output>{Math.round((transform.transparency ?? 0) * 100)}%</output></span><input aria-label={t.transparency} type="range" min="0" max="1" step="0.01" value={transform.transparency ?? 0} onChange={(event) => setTransform((current) => ({ ...current, transparency: Number(event.target.value) }))} /></label>
-          <label className="rainbow-control"><span>{t.rainbowRadius}<output>{Math.round((transform.radius ?? 1) * 100)}%</output></span><input aria-label={t.rainbowRadius} type="range" min="0.55" max="1.45" step="0.01" value={transform.radius ?? 1} onChange={(event) => setTransform((current) => ({ ...current, radius: Number(event.target.value) }))} /></label>
+          <label className="rainbow-control"><span>{t.rainbowRadius}<output>{Math.round((transform.radius ?? 1) * 100)}%</output></span><input aria-label={t.rainbowRadius} type="range" min="0.55" max="15" step="0.05" value={transform.radius ?? 1} onChange={(event) => setTransform((current) => ({ ...current, radius: Number(event.target.value) }))} /></label>
           <label className="rainbow-control"><span>{t.colorWidth}<output>{Math.round((transform.colorWidth ?? 1) * 100)}%</output></span><input aria-label={t.colorWidth} type="range" min="0.35" max="1.8" step="0.01" value={transform.colorWidth ?? 1} onChange={(event) => setTransform((current) => ({ ...current, colorWidth: Number(event.target.value) }))} /></label>
+          <label className="rainbow-control"><span>{t.rainbowAngle}<output>{Math.round(transform.angle ?? 180)}°</output></span><input aria-label={t.rainbowAngle} type="range" min="10" max="180" step="1" value={transform.angle ?? 180} onChange={(event) => setTransform((current) => ({ ...current, angle: Number(event.target.value) }))} /></label>
           <button className="reset-rainbow" type="button" onClick={resetRainbow}><Icon name="reset" />{t.resetRainbow}</button>
           <button className="y2k-button finish-card" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" />{finishing ? t.developing : t.finishCard}</button>
         </div>
@@ -536,7 +553,7 @@ export default function App() {
   const [selectedColor, setSelectedColor] = useState('red')
   const [composing, setComposing] = useState(QA_MODE === 'compose')
   const [background, setBackground] = useState(QA_MODE === 'compose' ? './rainbow.svg' : null)
-  const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1 })
+  const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1, angle: 180 })
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [finishing, setFinishing] = useState(false)
