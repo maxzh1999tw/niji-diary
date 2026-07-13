@@ -172,9 +172,9 @@ function ColorWheel({ selected, labels, sampleColor, sampleLabel, onSelect }) {
         const angle = -90 + index * (360 / 7)
         const radians = angle * Math.PI / 180
         const style = { '--wheel-x': `${50 + Math.cos(radians) * 38}%`, '--wheel-y': `${50 + Math.sin(radians) * 38}%` }
-        return <button type="button" key={key} style={style} className={`wheel-choice wheel-${key} ${selected === key ? 'selected' : ''}`} aria-pressed={selected === key} onClick={() => onSelect(key)}><span>{labels[index]}</span></button>
+        return <button type="button" key={key} style={style} className={`wheel-choice wheel-${key} ${selected === key ? 'selected' : ''}`} aria-pressed={selected === key} onClick={() => onSelect(key)}><i aria-hidden="true" /><span>{labels[index]}</span>{selected === key ? <b><Icon name="check" size={13} /></b> : null}</button>
       })}
-      <div className="wheel-center" style={{ '--sample': sampleColor }}><span>{sampleLabel}</span><small>{sampleColor.replace('rgb', '')}</small></div>
+      <div className="wheel-center" style={{ '--sample': sampleColor }} role="img" aria-label={`${sampleLabel}: ${sampleColor}`} />
     </div>
   )
 }
