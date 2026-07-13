@@ -213,8 +213,8 @@ function SourceThumbs({ photos, samples = {}, labels }) {
     : null)}</div>
 }
 
-function PolaroidCard({ image, alt, media, overlay, className = '', children }) {
-  return <div className={`polaroid-card ${className}`}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><div className="polaroid-caption-slot">{children}</div></div>
+function PolaroidCard({ image, alt, media, overlay, date, lang, className = '', children }) {
+  return <div className={`polaroid-card ${className}`}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{formatDate(date, lang, true)}</time></div></div>
 }
 
 function PolaroidCaption({ children }) {
@@ -538,12 +538,10 @@ function ArchiveScreen({ history, lang, t, onOpen }) {
   return (
     <section className="archive-screen screen-enter" aria-labelledby="archive-title">
       <div className="screen-title"><span className="chrome-kicker">RAINBOW LOG</span><h1 id="archive-title">{t.archiveTitle}</h1><p>{formatText(t.rainbowCount, { count: history.length })}</p></div>
-      {history.length ? <div className="archive-grid">{history.map((item, index) => (
+      {history.length ? <div className="archive-grid">{history.map((item) => (
         <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
-          <span className="archive-number">#{String(history.length - index).padStart(3, '0')}</span>
-          <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+          <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
           <SourceThumbs photos={item.photos} samples={item.samples} labels={t.colors} />
-          <span className="archive-date">{formatDate(item.date, lang, true)}</span>
         </button>
       ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
     </section>
@@ -567,15 +565,15 @@ function SettingsScreen({ lang, setLang, t }) {
 function RainbowModal({ day, lang, t, onClose, onCaptionChange, onCaptionCommit }) {
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
-  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} /></section></div>
+  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} /></section></div>
 }
 
-function DevelopedCard({ day, t, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
+function DevelopedCard({ day, lang, t, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className="printer-stage" aria-label={t.developedTitle}><div className="photo-printer" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div>
+    <div className="printer-stage" aria-label={t.developedTitle}><div className="photo-printer" aria-hidden="true"><i /><span>NIJI PRINT 2000</span></div><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div>
     <SourceThumbs photos={day.photos} samples={day.samples} labels={t.colors} />
     <div className="result-actions"><button className="save-card-action" type="button" onClick={onSave}><Icon name="download" />{t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare}><Icon name="share" />{t.shareImage}</button></div>
     <div className="share-targets" aria-label={t.shareTargets}><span>LINE</span><span>IG STORY</span><span>THREADS</span></div>
@@ -805,6 +803,6 @@ export default function App() {
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
     <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
-    <DevelopedCard day={developedDay} t={t} onSave={saveDevelopedCard} onShare={shareDevelopedCard} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
+    <DevelopedCard day={developedDay} lang={lang} t={t} onSave={saveDevelopedCard} onShare={shareDevelopedCard} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
   </div>
 }
