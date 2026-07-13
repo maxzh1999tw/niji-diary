@@ -563,10 +563,26 @@ function SettingsScreen({ lang, setLang, t }) {
   )
 }
 
-function RainbowModal({ day, lang, t, onClose, onCaptionChange, onCaptionCommit }) {
+function RainbowModal({ day, lang, t, onClose, onSave, onShare, onCaptionChange, onCaptionCommit }) {
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    if (!day) return undefined
+    const previousFocus = document.activeElement
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    requestAnimationFrame(() => dialogRef.current?.focus())
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previousFocus?.focus?.()
+    }
+  }, [day?.date])
+
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
-  return <div className="modal-scrim" role="presentation" onMouseDown={onClose}><section className="rainbow-modal" role="dialog" aria-modal="true" aria-labelledby="modal-date" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={onClose} aria-label={t.close}>×</button><span className="chrome-kicker">MEMORY CARD</span><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></section></div>
+  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions"><button className="lightbox-save" type="button" onClick={onSave}><Icon name="download" />{t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare}><Icon name="share" />{t.shareImage}</button></div></section></div>
 }
 
 function DevelopedCard({ day, lang, t, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
@@ -724,28 +740,28 @@ export default function App() {
     finally { setFinishing(false) }
   }
 
-  function saveDevelopedCard() {
-    if (!developedDay?.cardImage) return
+  function saveRainbowCard(target) {
+    if (!target?.cardImage) return
     const link = document.createElement('a')
-    link.href = developedDay.cardImage
-    link.download = `niji-rainbow-${developedDay.date}.jpg`
+    link.href = target.cardImage
+    link.download = `niji-rainbow-${target.date}.jpg`
     link.click()
     showMessage(t.imageSaved)
   }
 
-  async function shareDevelopedCard() {
-    if (!developedDay?.cardImage) return
-    const filename = `niji-rainbow-${developedDay.date}.jpg`
-    const file = dataUrlToFile(developedDay.cardImage, filename)
+  async function shareRainbowCard(target) {
+    if (!target?.cardImage) return
+    const filename = `niji-rainbow-${target.date}.jpg`
+    const file = dataUrlToFile(target.cardImage, filename)
     try {
       if (file && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: t.shareTitle, text: developedDay.caption ?? t.defaultCaption })
+        await navigator.share({ files: [file], title: t.shareTitle, text: target.caption ?? t.defaultCaption })
         showMessage(t.shared)
       } else if (navigator.share) {
-        await navigator.share({ title: t.shareTitle, text: developedDay.caption ?? t.defaultCaption, url: location.href })
+        await navigator.share({ title: t.shareTitle, text: target.caption ?? t.defaultCaption, url: location.href })
         showMessage(t.shared)
       } else {
-        saveDevelopedCard()
+        saveRainbowCard(target)
         showMessage(t.shareFallback)
       }
     } catch (error) {
@@ -802,7 +818,7 @@ export default function App() {
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
-    <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
-    <DevelopedCard day={developedDay} lang={lang} t={t} onSave={saveDevelopedCard} onShare={shareDevelopedCard} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
+    <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
+    <DevelopedCard day={developedDay} lang={lang} t={t} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
   </div>
 }
