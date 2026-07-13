@@ -84,3 +84,16 @@ export function analyzeRegion(imageData, width, height, point = { x: 0.5, y: 0.5
     samplePoint: point,
   }
 }
+
+export function analyzePixel(imageData, width, height, point = { x: 0.5, y: 0.5 }) {
+  const x = Math.max(0, Math.min(width - 1, Math.round(point.x * (width - 1))))
+  const y = Math.max(0, Math.min(height - 1, Math.round(point.y * (height - 1))))
+  const index = (y * width + x) * 4
+  const r = imageData[index], g = imageData[index + 1], b = imageData[index + 2]
+  return {
+    ...analyzePixels(new Uint8ClampedArray([r, g, b, 255]), 4),
+    sampleColor: `rgb(${r}, ${g}, ${b})`,
+    samplePoint: point,
+    pixel: { x, y },
+  }
+}

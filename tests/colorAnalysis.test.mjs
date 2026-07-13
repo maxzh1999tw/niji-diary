@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { analyzePixels, analyzeRegion } from '../src/colorAnalysis.js'
+import { analyzePixel, analyzePixels, analyzeRegion } from '../src/colorAnalysis.js'
 
 const samples = {
   red: [220, 35, 55],
@@ -31,3 +31,10 @@ for (let y = 0; y < height; y++) {
 assert.equal(analyzeRegion(image, width, height, { x: 0.5, y: 0.5 }, 0.14).suggestedKey, 'red')
 assert.equal(analyzeRegion(image, width, height, { x: 0.1, y: 0.1 }, 0.08).suggestedKey, 'blue')
 console.log('Region sampling: center and tapped positions detected correctly.')
+
+const exactCenter = analyzePixel(image, width, height, { x: 0.5, y: 0.5 })
+const exactCorner = analyzePixel(image, width, height, { x: 0.1, y: 0.1 })
+assert.equal(exactCenter.sampleColor, 'rgb(220, 35, 55)')
+assert.equal(exactCorner.sampleColor, 'rgb(30, 135, 220)')
+assert.deepEqual(exactCenter.pixel, { x: 10, y: 10 })
+console.log('Pixel sampling: exact source pixels returned without area averaging.')

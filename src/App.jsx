@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { analyzeRegion, COLOR_KEYS } from './colorAnalysis.js'
+import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
 import { getCompletedDays, getDay, saveDay } from './storage.js'
 
@@ -49,13 +49,7 @@ async function processPhoto(file) {
   const context = canvas.getContext('2d', { alpha: false })
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
 
-  const sampleCanvas = document.createElement('canvas')
-  sampleCanvas.width = 72
-  sampleCanvas.height = 72
-  const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true })
-  sampleContext.drawImage(image, 0, 0, 72, 72)
-  const pixels = sampleContext.getImageData(0, 0, 72, 72).data
-  const analysis = analyzeRegion(pixels, 72, 72)
+  const analysis = sampleSourcePhoto(image, { x: 0.5, y: 0.5 })
   image.close?.()
   return { image: canvas.toDataURL('image/jpeg', 0.84), ...analysis }
 }
@@ -99,13 +93,17 @@ function drawCover(context, image, width, height) {
 }
 
 function sampleSourcePhoto(image, point) {
-  const width = 200
-  const height = Math.max(1, Math.round(width * image.naturalHeight / image.naturalWidth))
+  const sourceWidth = image.naturalWidth || image.width
+  const sourceHeight = image.naturalHeight || image.height
+  const x = Math.max(0, Math.min(sourceWidth - 1, Math.round(point.x * (sourceWidth - 1))))
+  const y = Math.max(0, Math.min(sourceHeight - 1, Math.round(point.y * (sourceHeight - 1))))
   const canvas = document.createElement('canvas')
-  canvas.width = width; canvas.height = height
+  canvas.width = 1; canvas.height = 1
   const context = canvas.getContext('2d', { willReadFrequently: true })
-  context.drawImage(image, 0, 0, width, height)
-  return analyzeRegion(context.getImageData(0, 0, width, height).data, width, height, point, 0.045)
+  context.imageSmoothingEnabled = false
+  context.drawImage(image, x, y, 1, 1, 0, 0, 1, 1)
+  const analysis = analyzePixel(context.getImageData(0, 0, 1, 1).data, 1, 1, { x: 0, y: 0 })
+  return { ...analysis, samplePoint: point, pixel: { x, y } }
 }
 
 async function renderComposite(background, samples, transform) {
@@ -279,7 +277,7 @@ function FullscreenSampler({ staged, t, onClose, onSample }) {
   return <section className="sampler-overlay" role="dialog" aria-modal="true" aria-labelledby="sampler-title">
     <header className="sampler-header"><button className="icon-button" type="button" onClick={onClose} aria-label={t.cancel}><Icon name="back" /></button><div><span className="chrome-kicker">COLOR PICKER</span><h2 id="sampler-title">{t.samplerTitle}</h2></div><div className="sampler-live" style={{ '--sample': staged.sampleColor }}><i /><span>{t.currentSample}<small>{staged.sampleColor.replace('rgb', '')}</small></span></div></header>
     <div className="sampler-viewport" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheelZoom}>
-      <div className="sampler-media" style={{ '--image-aspect': imageAspect, transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}>
+      <div className="sampler-media" style={{ '--image-aspect': imageAspect, '--inverse-zoom': 1 / view.zoom, transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}>
         <img className="sampler-image" src={staged.image} alt={t.newPhotoAlt} draggable="false" onLoad={(event) => setImageAspect(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight || 1)} />
         <span className="sample-reticle sampler-reticle" style={{ left: `${staged.samplePoint.x * 100}%`, top: `${staged.samplePoint.y * 100}%`, '--sample': staged.sampleColor }}><i /></span>
       </div>
