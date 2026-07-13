@@ -7,6 +7,7 @@ const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本�
 const TAB_KEYS = ['today', 'archive', 'settings']
 const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
 const QA_MODE = import.meta.env.DEV ? new URLSearchParams(location.search).get('qa') : null
+const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
 
 function Icon({ name, size = 24 }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
@@ -97,12 +98,13 @@ function drawCover(context, image, width, height) {
   context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height)
 }
 
-function sampleDisplayedPhoto(image, point) {
-  const width = 160, height = 200
+function sampleSourcePhoto(image, point) {
+  const width = 200
+  const height = Math.max(1, Math.round(width * image.naturalHeight / image.naturalWidth))
   const canvas = document.createElement('canvas')
   canvas.width = width; canvas.height = height
   const context = canvas.getContext('2d', { willReadFrequently: true })
-  drawCover(context, image, width, height)
+  context.drawImage(image, 0, 0, width, height)
   return analyzeRegion(context.getImageData(0, 0, width, height).data, width, height, point, 0.045)
 }
 
@@ -162,7 +164,7 @@ function RainbowArtwork({ samples, transform, onPointerDown, onPointerMove, onPo
   </div>
 }
 
-function ColorWheel({ selected, labels, sampleColor, onSelect }) {
+function ColorWheel({ selected, labels, sampleColor, sampleLabel, onSelect }) {
   return (
     <div className="color-wheel" role="group" aria-label={labels.join('、')}>
       <div className="wheel-ring" aria-hidden="true" />
@@ -172,12 +174,12 @@ function ColorWheel({ selected, labels, sampleColor, onSelect }) {
         const style = { '--wheel-x': `${50 + Math.cos(radians) * 38}%`, '--wheel-y': `${50 + Math.sin(radians) * 38}%` }
         return <button type="button" key={key} style={style} className={`wheel-choice wheel-${key} ${selected === key ? 'selected' : ''}`} aria-pressed={selected === key} onClick={() => onSelect(key)}><span>{labels[index]}</span></button>
       })}
-      <div className="wheel-center"><i style={{ background: sampleColor }} /><span>AI</span></div>
+      <div className="wheel-center" style={{ '--sample': sampleColor }}><span>{sampleLabel}</span><small>{sampleColor.replace('rgb', '')}</small></div>
     </div>
   )
 }
 
-function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, onConfirm, onResample }) {
+function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, onConfirm, onOpenSampler }) {
   const selectedIndex = COLOR_KEYS.indexOf(selectedColor)
   const replacing = Boolean(photos[selectedColor])
   return (
@@ -189,12 +191,12 @@ function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, on
         <p>{t.wheelHint}</p>
       </div>
       <div className="capture-layout">
-        <button className="photo-preview sample-preview" type="button" onClick={onResample} aria-label={t.resamplePhoto}>
+        <button className="photo-preview sample-preview" type="button" onClick={onOpenSampler} aria-label={t.expandToSample}>
           <img src={staged.image} alt={t.newPhotoAlt} />
           <span className="sample-reticle" style={{ left: `${staged.samplePoint.x * 100}%`, top: `${staged.samplePoint.y * 100}%`, '--sample': staged.sampleColor }}><i /></span>
-          <small>{t.tapToSample}</small>
+          <small>{t.expandToSample}</small>
         </button>
-        <ColorWheel selected={selectedColor} labels={t.colors} sampleColor={staged.sampleColor} onSelect={onSelect} />
+        <ColorWheel selected={selectedColor} labels={t.colors} sampleColor={staged.sampleColor} sampleLabel={t.currentSample} onSelect={onSelect} />
       </div>
       <div className="stage-actions">
         {replacing ? <p className="replace-warning" role="status">{formatText(t.replaceWarning, { color: t.colors[selectedIndex] })}</p> : null}
@@ -202,6 +204,88 @@ function CaptureStage({ staged, selectedColor, photos, t, onSelect, onCancel, on
       </div>
     </section>
   )
+}
+
+function FullscreenSampler({ staged, t, onClose, onSample }) {
+  const [view, setView] = useState({ zoom: 1, x: 0, y: 0 })
+  const [imageAspect, setImageAspect] = useState(1)
+  const pointers = useRef(new Map())
+  const gesture = useRef(null)
+
+  function clampZoom(value) { return Math.max(1, Math.min(4, value)) }
+
+  function zoomBy(amount) {
+    setView((current) => {
+      const zoom = clampZoom(current.zoom + amount)
+      return { zoom, x: zoom === 1 ? 0 : current.x, y: zoom === 1 ? 0 : current.y }
+    })
+  }
+
+  function resetView() { setView({ zoom: 1, x: 0, y: 0 }) }
+
+  function pointerDown(event) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false })
+    const values = [...pointers.current.values()]
+    if (values.length === 1) gesture.current = { type: 'pan', lastX: event.clientX, lastY: event.clientY }
+    if (values.length === 2) {
+      const [a, b] = values
+      a.moved = true; b.moved = true
+      gesture.current = { type: 'pinch', distance: Math.hypot(a.x - b.x, a.y - b.y), centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, view }
+    }
+  }
+
+  function pointerMove(event) {
+    const pointer = pointers.current.get(event.pointerId)
+    if (!pointer) return
+    if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 7) pointer.moved = true
+    pointer.x = event.clientX; pointer.y = event.clientY
+    const values = [...pointers.current.values()]
+    if (values.length === 2 && gesture.current?.type === 'pinch') {
+      const [a, b] = values
+      const distance = Math.hypot(a.x - b.x, a.y - b.y)
+      const centerX = (a.x + b.x) / 2, centerY = (a.y + b.y) / 2
+      const zoom = clampZoom(gesture.current.view.zoom * distance / Math.max(1, gesture.current.distance))
+      setView({ zoom, x: gesture.current.view.x + centerX - gesture.current.centerX, y: gesture.current.view.y + centerY - gesture.current.centerY })
+    } else if (values.length === 1 && gesture.current?.type === 'pan' && view.zoom > 1) {
+      const dx = event.clientX - gesture.current.lastX, dy = event.clientY - gesture.current.lastY
+      gesture.current.lastX = event.clientX; gesture.current.lastY = event.clientY
+      setView((current) => ({ ...current, x: Math.max(-320, Math.min(320, current.x + dx)), y: Math.max(-320, Math.min(320, current.y + dy)) }))
+    }
+  }
+
+  function pointerUp(event) {
+    const pointer = pointers.current.get(event.pointerId)
+    const wasSingleTap = pointers.current.size === 1 && pointer && !pointer.moved
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    pointers.current.delete(event.pointerId)
+    if (wasSingleTap) {
+      const image = event.currentTarget.querySelector('.sampler-image')
+      const rect = image?.getBoundingClientRect()
+      if (image && rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom) {
+        onSample(image, { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height })
+      }
+    }
+    const remaining = [...pointers.current.values()]
+    gesture.current = remaining.length === 1 ? { type: 'pan', lastX: remaining[0].x, lastY: remaining[0].y } : null
+  }
+
+  function wheelZoom(event) {
+    event.preventDefault()
+    zoomBy(event.deltaY < 0 ? 0.2 : -0.2)
+  }
+
+  return <section className="sampler-overlay" role="dialog" aria-modal="true" aria-labelledby="sampler-title">
+    <header className="sampler-header"><button className="icon-button" type="button" onClick={onClose} aria-label={t.cancel}><Icon name="back" /></button><div><span className="chrome-kicker">COLOR PICKER</span><h2 id="sampler-title">{t.samplerTitle}</h2></div><div className="sampler-live" style={{ '--sample': staged.sampleColor }}><i /><span>{t.currentSample}<small>{staged.sampleColor.replace('rgb', '')}</small></span></div></header>
+    <div className="sampler-viewport" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheelZoom}>
+      <div className="sampler-media" style={{ '--image-aspect': imageAspect, transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}>
+        <img className="sampler-image" src={staged.image} alt={t.newPhotoAlt} draggable="false" onLoad={(event) => setImageAspect(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight || 1)} />
+        <span className="sample-reticle sampler-reticle" style={{ left: `${staged.samplePoint.x * 100}%`, top: `${staged.samplePoint.y * 100}%`, '--sample': staged.sampleColor }}><i /></span>
+      </div>
+    </div>
+    <footer className="sampler-footer"><p>{t.pinchHint}</p><div className="zoom-controls"><button type="button" onClick={() => zoomBy(-0.25)} aria-label={t.zoomOut}>−</button><output aria-label={t.zoomLevel}>{Math.round(view.zoom * 100)}%</output><button type="button" onClick={() => zoomBy(0.25)} aria-label={t.zoomIn}>＋</button><button type="button" className="reset-zoom" onClick={resetView}>{t.resetZoom}</button></div><button className="y2k-button sampler-done" type="button" onClick={onClose}><Icon name="check" />{t.finishSampling}</button></footer>
+  </section>
 }
 
 function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, onStartCompose }) {
@@ -335,7 +419,8 @@ export default function App() {
   const [day, setDay] = useState(null)
   const [history, setHistory] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
-  const [staged, setStaged] = useState(null)
+  const [staged, setStaged] = useState(QA_SAMPLE)
+  const [samplerOpen, setSamplerOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState('red')
   const [composing, setComposing] = useState(QA_MODE === 'compose')
   const [background, setBackground] = useState(QA_MODE === 'compose' ? './rainbow.svg' : null)
@@ -387,6 +472,7 @@ export default function App() {
 
   function navigate(tab) {
     setStaged(null)
+    setSamplerOpen(false)
     setComposing(false)
     setActiveTab(tab)
     location.hash = tab
@@ -410,6 +496,7 @@ export default function App() {
     const nextDay = { ...day, schemaVersion: 2, photos: { ...photos, [selectedColor]: staged.image }, samples: { ...(day.samples ?? {}), [selectedColor]: staged.sampleColor } }
     setDay(nextDay)
     setStaged(null)
+    setSamplerOpen(false)
     navigator.vibrate?.([25, 35, 25])
     showMessage(formatText(t.colorAdded, { color: t.colors[COLOR_KEYS.indexOf(selectedColor)] }))
     try { await saveDay(nextDay) } catch { showMessage(t.error) }
@@ -419,15 +506,8 @@ export default function App() {
     }
   }
 
-  function resamplePhoto(event) {
-    const image = event.currentTarget.querySelector('img')
-    const rect = event.currentTarget.getBoundingClientRect()
-    if (!image || !rect.width || !rect.height) return
-    const point = {
-      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
-    }
-    const analysis = sampleDisplayedPhoto(image, point)
+  function resamplePhoto(image, point) {
+    const analysis = sampleSourcePhoto(image, point)
     setStaged((current) => ({ ...current, ...analysis }))
     setSelectedColor(analysis.suggestedKey)
     navigator.vibrate?.(20)
@@ -489,7 +569,7 @@ export default function App() {
     : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} />
       : staged
-        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => setStaged(null)} onConfirm={confirmColor} onResample={resamplePhoto} />
+        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
           ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} t={t} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
@@ -504,6 +584,7 @@ export default function App() {
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
+    {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
     <RainbowModal day={selectedDay} lang={lang} t={t} onClose={() => setSelectedDay(null)} />
   </div>
 }
