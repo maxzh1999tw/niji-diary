@@ -694,8 +694,7 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
     <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><PrinterShell /><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><PrinterShell foreground /></div>
     <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
     <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
-    <div className="share-targets" aria-label={t.shareTargets}><span>LINE</span><span>IG STORY</span><span>THREADS</span></div>
-    <button className="result-done" type="button" onClick={onDone}>{t.backToToday}</button>
+    <button className="result-done" type="button" onClick={onDone}>{t.done}</button>
   </section></div>
 }
 
