@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
+import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { getCompletedDays, getDay, saveDay } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
@@ -333,7 +334,7 @@ function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMov
   const innerRatio = innerRadius / outerRadius
   const outerEdgeStart = innerRatio + (1 - innerRatio) * 0.985
   const spectrumStops = [...COLOR_KEYS].reverse().map((key, index) => <stop key={key} offset={innerRatio + (1 - innerRatio) * (index + 0.5) / COLOR_KEYS.length} stopColor={samples[key] || FALLBACK_COLORS[key]} />)
-  return <div className="rainbow-artwork" style={style} role="img" aria-label={label} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
+  return <div className="rainbow-artwork" style={style} role="img" aria-label={label} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onLostPointerCapture={onPointerUp} onWheel={onWheel}>
     <svg viewBox="0 0 300 316" aria-hidden="true">
       <defs>
         <radialGradient id="rainbow-spectrum" gradientUnits="userSpaceOnUse" cx="150" cy="158" r={outerRadius}>
@@ -526,7 +527,32 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
   const pointers = useRef(new Map())
   const gesture = useRef(null)
   const liveTransform = useRef(transform)
-  liveTransform.current = transform
+  const renderFrame = useRef(null)
+
+  useEffect(() => {
+    if (renderFrame.current === null) liveTransform.current = transform
+  }, [transform])
+
+  useEffect(() => () => {
+    if (renderFrame.current !== null) cancelAnimationFrame(renderFrame.current)
+  }, [])
+
+  function queueTransform(next) {
+    liveTransform.current = next
+    if (renderFrame.current !== null) return
+    renderFrame.current = requestAnimationFrame(() => {
+      renderFrame.current = null
+      setTransform(liveTransform.current)
+    })
+  }
+
+  function flushTransform() {
+    if (renderFrame.current !== null) {
+      cancelAnimationFrame(renderFrame.current)
+      renderFrame.current = null
+    }
+    setTransform(liveTransform.current)
+  }
 
   function beginGesture(event) {
     const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
@@ -534,21 +560,17 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    restartGesture(frame)
+    rebaseGesture(frame)
   }
 
-  function restartGesture(frame) {
-    const points = [...pointers.current.values()]
-    if (points.length >= 2) {
-      const [a, b] = points
-      gesture.current = {
-        mode: 'pinch', frame, transform: liveTransform.current,
-        centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2,
-        distance: Math.hypot(b.x - a.x, b.y - a.y),
-        angle: Math.atan2(b.y - a.y, b.x - a.x),
-      }
-    } else if (points.length === 1) {
-      gesture.current = { mode: 'pan', frame, transform: liveTransform.current, x: points[0].x, y: points[0].y }
+  function rebaseGesture(frame) {
+    const entries = [...pointers.current.entries()]
+    if (entries.length >= 2) {
+      const active = entries.slice(0, 2)
+      gesture.current = { mode: 'pinch', frame, pointerIds: active.map(([id]) => id), points: active.map(([, point]) => ({ ...point })) }
+    } else if (entries.length === 1) {
+      const [pointerId, point] = entries[0]
+      gesture.current = { mode: 'pan', frame, pointerId, point: { ...point } }
     } else gesture.current = null
   }
 
@@ -556,50 +578,41 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     if (!pointers.current.has(event.pointerId) || !gesture.current) return
     event.preventDefault()
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
-    const points = [...pointers.current.values()]
     const start = gesture.current
 
-    if (start.mode === 'pinch' && points.length >= 2) {
-      const [a, b] = points
-      const centerX = (a.x + b.x) / 2
-      const centerY = (a.y + b.y) / 2
-      const distance = Math.hypot(b.x - a.x, b.y - a.y)
-      const angle = Math.atan2(b.y - a.y, b.x - a.x)
-      const next = {
-        ...start.transform,
-        x: start.transform.x + (centerX - start.centerX) / start.frame.width * 100,
-        y: start.transform.y + (centerY - start.centerY) / start.frame.height * 100,
-        scale: start.transform.scale * distance / Math.max(start.distance, Number.EPSILON),
-        rotation: start.transform.rotation + (angle - start.angle) * 180 / Math.PI,
-      }
-      liveTransform.current = next
-      setTransform(next)
-    } else if (start.mode === 'pan' && points.length === 1) {
-      const next = { ...start.transform, x: start.transform.x + (points[0].x - start.x) / start.frame.width * 100, y: start.transform.y + (points[0].y - start.y) / start.frame.height * 100 }
-      liveTransform.current = next
-      setTransform(next)
+    if (start.mode === 'pinch') {
+      const points = start.pointerIds.map((id) => pointers.current.get(id))
+      if (points.some((point) => !point)) { rebaseGesture(start.frame); return }
+      queueTransform(applyPinchDelta(liveTransform.current, start.frame, start.points, points))
+      start.points = points.map((point) => ({ ...point }))
+    } else if (start.mode === 'pan') {
+      const point = pointers.current.get(start.pointerId)
+      if (!point || pointers.current.size !== 1) { rebaseGesture(start.frame); return }
+      queueTransform(applyPanDelta(liveTransform.current, start.frame, start.point, point))
+      start.point = { ...point }
     }
   }
 
   function endGesture(event) {
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!pointers.current.has(event.pointerId)) return
+    const hasCapture = event.currentTarget.hasPointerCapture?.(event.pointerId)
     pointers.current.delete(event.pointerId)
+    if (hasCapture) event.currentTarget.releasePointerCapture(event.pointerId)
+    flushTransform()
     const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
-    if (frame) restartGesture(frame)
+    if (frame) rebaseGesture(frame)
   }
 
   function zoomWithWheel(event) {
     event.preventDefault()
     const factor = Math.exp(-event.deltaY * 0.0015)
-    setTransform((current) => {
-      const next = { ...current, scale: current.scale * factor }
-      liveTransform.current = next
-      return next
-    })
+    queueTransform({ ...liveTransform.current, scale: liveTransform.current.scale * factor })
   }
 
   function resetRainbow() {
     const next = { x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1, angle: 180 }
+    if (renderFrame.current !== null) cancelAnimationFrame(renderFrame.current)
+    renderFrame.current = null
     liveTransform.current = next
     setTransform(next)
   }
@@ -616,7 +629,7 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
       <div className="canvas-stage"><div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div>
       <div className="editor-dock">
-        <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => setTransform((current) => ({ ...current, [activeControl.key]: Number(event.target.value) }))} /></label>
+        <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={activeTool === tool.key ? 'active' : ''} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}<button className="toolbar-reset" type="button" onClick={resetRainbow}><Icon name="reset" size={21} /><span>{t.resetShort}</span></button></div>
       </div>
     </div>}

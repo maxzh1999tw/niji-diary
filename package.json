@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/colorAnalysis.test.mjs"
+    "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
