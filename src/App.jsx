@@ -654,6 +654,8 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   const deleteDialogRef = useRef(null)
   const nativeTouchHandlers = useRef(null)
   const settleTimer = useRef(null)
+  const discardTimer = useRef(null)
+  const discarding = useRef(false)
   const suppressClickUntil = useRef(0)
 
   useEffect(() => {
@@ -666,6 +668,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   useEffect(() => () => {
     window.clearTimeout(longPressTimer.current)
     window.clearTimeout(settleTimer.current)
+    window.clearTimeout(discardTimer.current)
     if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
     detachNativeTouchListeners()
   }, [])
@@ -715,6 +718,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   }
 
   function beginActiveDrag(item, source, kind, pointerId, x, y) {
+    if (discarding.current) return
     clearLongPress()
     window.clearTimeout(settleTimer.current)
     if (previewRef.current) {
@@ -805,6 +809,43 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     settleTimer.current = window.setTimeout(() => preview.classList.remove('settling'), 260)
   }
 
+  function animatePreviewToTrash(item, currentOffset = { x: 0, y: 0 }) {
+    if (discarding.current) return
+    const preview = previewRef.current
+    const trash = trashRef.current
+    if (!preview || !trash) {
+      setDeleteMode(null)
+      onRequestDelete(item)
+      return
+    }
+
+    discarding.current = true
+    const previewRect = preview.getBoundingClientRect()
+    const trashRect = trash.getBoundingClientRect()
+    const targetX = currentOffset.x + (trashRect.left + trashRect.width / 2) - (previewRect.left + previewRect.width / 2)
+    const targetY = currentOffset.y + (trashRect.top + trashRect.height / 2) - (previewRect.top + previewRect.height / 2)
+
+    preview.classList.remove('settling')
+    trash.classList.add('accepting')
+    trash.disabled = true
+    trash.setAttribute('aria-busy', 'true')
+    requestAnimationFrame(() => {
+      preview.style.setProperty('--drag-x', `${targetX}px`)
+      preview.style.setProperty('--drag-y', `${targetY}px`)
+      preview.classList.add('discarding')
+    })
+    navigator.vibrate?.([28, 24, 42])
+
+    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 30 : 360
+    window.clearTimeout(discardTimer.current)
+    discardTimer.current = window.setTimeout(() => {
+      discarding.current = false
+      setDeleteMode(null)
+      setOverTrash(false)
+      onRequestDelete(item)
+    }, duration)
+  }
+
   function finishPress(x, y, requestDelete) {
     const current = drag.current
     if (!current) return
@@ -822,12 +863,11 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     animationFrame.current = null
     detachNativeTouchListeners()
     drag.current = null
-    setOverTrash(false)
     if (current.active && current.overTrash && requestDelete) {
-      setDeleteMode(null)
-      onRequestDelete(current.item)
+      animatePreviewToTrash(current.item, { x: current.x - current.anchorX, y: current.y - current.anchorY })
       return
     }
+    setOverTrash(false)
     if (current.active) settlePreview()
   }
 
@@ -901,7 +941,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   }
 
   function closeDeleteMode() {
-    if (drag.current?.active) return
+    if (drag.current?.active || discarding.current) return
     setDeleteMode(null)
     setOverTrash(false)
   }
@@ -927,7 +967,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
         ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
       </div>
       <p className="visually-hidden" id="archive-delete-instructions">{t.archiveDeleteHint}</p>
-      {deleteMode ? createPortal(<div className="archive-delete-overlay"><button className="archive-delete-dismiss" type="button" onClick={closeDeleteMode} aria-label={t.close} tabIndex="-1" /><section ref={deleteDialogRef} className="archive-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-delete-date" tabIndex="-1" onKeyDown={handleDeleteModeKeyDown}><h2 className="visually-hidden" id="archive-delete-date">{formatDate(deleteMode.date, lang)}</h2><div ref={previewRef} className="archive-delete-polaroid" onPointerDown={beginDeleteModePointer} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={beginDeleteModeTouch} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress}><ArchivePolaroid item={deleteMode} lang={lang} t={t} /></div><button ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} type="button" onClick={() => { if (!drag.current?.active) { setDeleteMode(null); onRequestDelete(deleteMode) } }} aria-label={t.dragToDelete}><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong aria-live="polite">{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></button></section></div>, document.body) : null}
+      {deleteMode ? createPortal(<div className="archive-delete-overlay"><button className="archive-delete-dismiss" type="button" onClick={closeDeleteMode} aria-label={t.close} tabIndex="-1" /><section ref={deleteDialogRef} className="archive-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-delete-date" tabIndex="-1" onKeyDown={handleDeleteModeKeyDown}><h2 className="visually-hidden" id="archive-delete-date">{formatDate(deleteMode.date, lang)}</h2><div ref={previewRef} className={`archive-delete-polaroid ${overTrash ? 'over-trash' : ''}`} onPointerDown={beginDeleteModePointer} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={beginDeleteModeTouch} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress}><ArchivePolaroid item={deleteMode} lang={lang} t={t} /></div><button ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} type="button" onClick={() => { if (!drag.current?.active) animatePreviewToTrash(deleteMode) }} aria-label={t.dragToDelete}><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong aria-live="polite">{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></button></section></div>, document.body) : null}
     </section>
   )
 }
