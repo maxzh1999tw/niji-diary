@@ -1,44 +1,104 @@
 export const COLOR_KEYS = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet']
 
-const TARGET_HUES = { red: 0, orange: 30, yellow: 56, green: 125, blue: 210, indigo: 248, violet: 292 }
+// OKLCH uses a perceptually uniform hue circle. These anchors follow the visual
+// centers of the seven rainbow families rather than equal RGB/HSV intervals.
+const HUE_ANCHORS = {
+  red: 20,
+  orange: 60,
+  yellow: 100,
+  green: 150,
+  blue: 240,
+  indigo: 280,
+  violet: 315,
+}
+
+const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value))
+
+function smoothstep(edge0, edge1, value) {
+  const position = clamp((value - edge0) / (edge1 - edge0))
+  return position * position * (3 - 2 * position)
+}
 
 function hueDistance(a, b) {
   const distance = Math.abs(a - b)
   return Math.min(distance, 360 - distance)
 }
 
-function rgbToHsv(r, g, b) {
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  const delta = max - min
-  let hue = 0
-  if (delta) {
-    if (max === r) hue = 60 * (((g - b) / delta) % 6)
-    else if (max === g) hue = 60 * ((b - r) / delta + 2)
-    else hue = 60 * ((r - g) / delta + 4)
+function srgbChannelToLinear(channel) {
+  const normalized = channel / 255
+  return normalized <= 0.04045
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4
+}
+
+export function rgbToOklch(red, green, blue) {
+  const r = srgbChannelToLinear(red)
+  const g = srgbChannelToLinear(green)
+  const b = srgbChannelToLinear(blue)
+
+  const linearL = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const linearM = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const linearS = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+
+  const lightness = 0.2104542553 * linearL + 0.793617785 * linearM - 0.0040720468 * linearS
+  const a = 1.9779984951 * linearL - 2.428592205 * linearM + 0.4505937099 * linearS
+  const labB = 0.0259040371 * linearL + 0.7827717662 * linearM - 0.808675766 * linearS
+  const chroma = Math.hypot(a, labB)
+  const hue = chroma < 1e-7 ? 0 : (Math.atan2(labB, a) * 180 / Math.PI + 360) % 360
+
+  return { lightness, chroma, hue }
+}
+
+function classifyHue(hue) {
+  let nearestKey = COLOR_KEYS[0]
+  let nearestDistance = Infinity
+  let secondDistance = Infinity
+
+  for (const key of COLOR_KEYS) {
+    const distance = hueDistance(hue, HUE_ANCHORS[key])
+    if (distance < nearestDistance) {
+      secondDistance = nearestDistance
+      nearestDistance = distance
+      nearestKey = key
+    } else if (distance < secondDistance) {
+      secondDistance = distance
+    }
   }
-  if (hue < 0) hue += 360
-  return { hue, saturation: max ? delta / max : 0, value: max / 255 }
+
+  return {
+    key: nearestKey,
+    distance: nearestDistance,
+    margin: secondDistance - nearestDistance,
+  }
 }
 
 export function analyzePixels(pixels, stride = 16) {
   const scores = Object.fromEntries(COLOR_KEYS.map((key) => [key, 0]))
   let redTotal = 0, greenTotal = 0, blueTotal = 0, colorWeight = 0
+  let reliabilityTotal = 0, clarityTotal = 0, visiblePixels = 0
 
   for (let index = 0; index < pixels.length; index += stride) {
     const r = pixels[index], g = pixels[index + 1], b = pixels[index + 2]
-    const { hue, saturation, value } = rgbToHsv(r, g, b)
-    if (value < 0.08 || value > 0.97 || saturation < 0.08) continue
-    let nearest = COLOR_KEYS[0], nearestDistance = 361
-    for (const key of COLOR_KEYS) {
-      const distance = hueDistance(hue, TARGET_HUES[key])
-      if (distance < nearestDistance) { nearest = key; nearestDistance = distance }
-    }
-    const weight = saturation * saturation * (0.45 + value * 0.55) * Math.max(0.15, 1 - nearestDistance / 90)
-    scores[nearest] += weight
+    const alpha = (pixels[index + 3] ?? 255) / 255
+    if (!alpha) continue
+
+    const { lightness, chroma, hue } = rgbToOklch(r, g, b)
+    const classification = classifyHue(hue)
+    const chromaReliability = smoothstep(0.018, 0.13, chroma)
+    const shadowReliability = smoothstep(0.025, 0.16, lightness)
+    const highlightReliability = 1 - smoothstep(0.94, 1, lightness)
+    const reliability = chromaReliability * (0.55 + 0.45 * shadowReliability * highlightReliability)
+    const clarity = smoothstep(0, 34, classification.margin)
+    const weight = alpha * (0.08 + 0.92 * reliability)
+
+    scores[classification.key] += weight
     redTotal += r * weight
     greenTotal += g * weight
     blueTotal += b * weight
     colorWeight += weight
+    reliabilityTotal += reliability * alpha
+    clarityTotal += clarity * reliability * alpha
+    visiblePixels += alpha
   }
 
   let suggestedKey = 'red', bestScore = -1, scoreTotal = 0
@@ -46,15 +106,23 @@ export function analyzePixels(pixels, stride = 16) {
     scoreTotal += scores[key]
     if (scores[key] > bestScore) { bestScore = scores[key]; suggestedKey = key }
   }
-  const fallback = [pixels[0] || 255, pixels[1] || 105, pixels[2] || 180]
+  const fallback = [pixels[0] ?? 255, pixels[1] ?? 105, pixels[2] ?? 180]
   const sampleColor = colorWeight
     ? `rgb(${Math.round(redTotal / colorWeight)}, ${Math.round(greenTotal / colorWeight)}, ${Math.round(blueTotal / colorWeight)})`
     : `rgb(${fallback.join(', ')})`
+  const consensus = scoreTotal ? bestScore / scoreTotal : 0
+  const averageReliability = visiblePixels ? reliabilityTotal / visiblePixels : 0
+  const averageClarity = reliabilityTotal ? clarityTotal / reliabilityTotal : 0
+  const confidence = Math.round(clamp(
+    8 + 91 * averageReliability * consensus * (0.35 + 0.65 * averageClarity),
+    8,
+    99,
+  ))
 
   return {
     suggestedKey,
     sampleColor,
-    confidence: scoreTotal ? Math.round((bestScore / scoreTotal) * 100) : 14,
+    confidence,
   }
 }
 
