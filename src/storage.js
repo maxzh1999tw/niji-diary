@@ -34,6 +34,15 @@ export async function saveDay(day) {
   }).finally(() => db.close())
 }
 
+export async function deleteDay(date) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(date)
+    request.onsuccess = () => resolve(date)
+    request.onerror = () => reject(request.error)
+  }).finally(() => db.close())
+}
+
 export async function getCompletedDays() {
   const db = await openDB()
   return new Promise((resolve, reject) => {

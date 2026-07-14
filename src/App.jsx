@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
-import { getCompletedDays, getDay, saveDay } from './storage.js'
+import { deleteDay, getCompletedDays, getDay, saveDay } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
 const TAB_KEYS = ['today', 'archive', 'settings']
@@ -28,6 +28,7 @@ function Icon({ name, size = 24 }) {
   if (name === 'reset') return <svg {...common}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
   if (name === 'check') return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>
   if (name === 'lock') return <svg {...common}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+  if (name === 'trash') return <svg {...common}><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="m6 7 1 14h10l1-14" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
   return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>
 }
 
@@ -637,19 +638,215 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
   </section>
 }
 
-function ArchiveScreen({ history, lang, t, onOpen }) {
+function ArchivePolaroid({ item, lang, t }) {
+  return <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+}
+
+function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
+  const [dragged, setDragged] = useState(null)
+  const [overTrash, setOverTrash] = useState(false)
+  const drag = useRef(null)
+  const longPressTimer = useRef(null)
+  const animationFrame = useRef(null)
+  const previewRef = useRef(null)
+  const trashRef = useRef(null)
+  const suppressClickUntil = useRef(0)
+
+  useEffect(() => () => {
+    window.clearTimeout(longPressTimer.current)
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
+  }, [])
+
+  function clearLongPress() {
+    window.clearTimeout(longPressTimer.current)
+    longPressTimer.current = null
+  }
+
+  function paintPreview() {
+    animationFrame.current = null
+    const current = drag.current
+    if (!current?.active || !previewRef.current) return
+    previewRef.current.style.setProperty('--drag-x', `${current.x - current.startX}px`)
+    previewRef.current.style.setProperty('--drag-y', `${current.y - current.startY}px`)
+  }
+
+  function queuePreviewPaint() {
+    if (animationFrame.current !== null) return
+    animationFrame.current = requestAnimationFrame(paintPreview)
+  }
+
+  function activateDrag() {
+    const current = drag.current
+    if (!current || current.active) return
+    current.active = true
+    current.overTrash = false
+    current.trashRect = null
+    if (current.kind === 'pointer') {
+      try { current.source.setPointerCapture?.(current.pointerId) } catch { /* Pointer may already be released. */ }
+    }
+    setDragged({ item: current.item, rect: current.source.getBoundingClientRect() })
+    setOverTrash(false)
+    suppressClickUntil.current = Date.now() + 1000
+    navigator.vibrate?.(18)
+    requestAnimationFrame(queuePreviewPaint)
+  }
+
+  function beginPress(item, source, kind, pointerId, x, y) {
+    clearLongPress()
+    drag.current = { item, source, kind, pointerId, startX: x, startY: y, x, y, active: false, overTrash: false, trashRect: null }
+    longPressTimer.current = window.setTimeout(activateDrag, 450)
+  }
+
+  function pointIsOverTrash(x, y) {
+    const current = drag.current
+    if (!current?.active) return false
+    current.trashRect ??= trashRef.current?.getBoundingClientRect() ?? null
+    const rect = current.trashRect
+    return Boolean(rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom)
+  }
+
+  function movePress(x, y, event) {
+    const current = drag.current
+    if (!current) return
+    current.x = x
+    current.y = y
+    if (!current.active) {
+      if (Math.hypot(x - current.startX, y - current.startY) > 10) {
+        clearLongPress()
+        drag.current = null
+      }
+      return
+    }
+    event.preventDefault()
+    queuePreviewPaint()
+    const nextOverTrash = pointIsOverTrash(x, y)
+    if (nextOverTrash !== current.overTrash) {
+      current.overTrash = nextOverTrash
+      setOverTrash(nextOverTrash)
+      if (nextOverTrash) navigator.vibrate?.(24)
+    }
+  }
+
+  function finishPress(x, y, requestDelete) {
+    const current = drag.current
+    if (!current) return
+    clearLongPress()
+    if (current.active) {
+      current.x = x
+      current.y = y
+      current.overTrash = pointIsOverTrash(x, y)
+      suppressClickUntil.current = Date.now() + 700
+    }
+    if (current.kind === 'pointer' && current.source.hasPointerCapture?.(current.pointerId)) {
+      current.source.releasePointerCapture(current.pointerId)
+    }
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
+    animationFrame.current = null
+    drag.current = null
+    setDragged(null)
+    setOverTrash(false)
+    if (current.active && current.overTrash && requestDelete) onRequestDelete(current.item)
+  }
+
+  function cancelPress() {
+    const current = drag.current
+    if (!current) return
+    finishPress(current.x, current.y, false)
+  }
+
+  function findTouch(touches, identifier) {
+    for (let index = 0; index < touches.length; index++) {
+      if (touches[index].identifier === identifier) return touches[index]
+    }
+    return null
+  }
+
+  function handleTouchStart(event, item) {
+    if (event.touches.length !== 1) { cancelPress(); return }
+    const touch = event.touches[0]
+    beginPress(item, event.currentTarget, 'touch', touch.identifier, touch.clientX, touch.clientY)
+  }
+
+  function handleTouchMove(event) {
+    const current = drag.current
+    if (!current || current.kind !== 'touch') return
+    const touch = findTouch(event.touches, current.pointerId)
+    if (touch) movePress(touch.clientX, touch.clientY, event)
+  }
+
+  function handleTouchEnd(event) {
+    const current = drag.current
+    if (!current || current.kind !== 'touch') return
+    const touch = findTouch(event.changedTouches, current.pointerId)
+    finishPress(touch?.clientX ?? current.x, touch?.clientY ?? current.y, true)
+  }
+
+  function handlePointerDown(event, item) {
+    if (event.pointerType === 'touch' || event.button !== 0) return
+    beginPress(item, event.currentTarget, 'pointer', event.pointerId, event.clientX, event.clientY)
+  }
+
+  function handlePointerMove(event) {
+    const current = drag.current
+    if (!current || current.kind !== 'pointer' || current.pointerId !== event.pointerId) return
+    movePress(event.clientX, event.clientY, event)
+  }
+
+  function handlePointerUp(event) {
+    const current = drag.current
+    if (!current || current.kind !== 'pointer' || current.pointerId !== event.pointerId) return
+    finishPress(event.clientX, event.clientY, true)
+  }
+
   return (
-    <section className="archive-screen screen-enter" aria-labelledby="archive-title">
+    <section className={`archive-screen screen-enter ${dragged ? 'archive-dragging' : ''}`} aria-labelledby="archive-title">
       <div className="screen-title"><span className="chrome-kicker">POLAROID ALBUM</span><h1 id="archive-title">{t.archiveTitle}</h1><p>{formatText(t.rainbowCount, { count: history.length })}</p></div>
       <div className="archive-scroll-region" role="region" aria-label={t.albumListLabel} tabIndex={0}>
         {history.length ? <div className="archive-grid">{history.map((item) => (
-          <button type="button" className="archive-card" key={item.date} onClick={() => onOpen(item)} aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })}>
-            <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+          <button type="button" className={`archive-card ${dragged?.item.date === item.date ? 'drag-origin' : ''}`} key={item.date} aria-describedby="archive-delete-instructions" aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} onClick={(event) => { if (Date.now() < suppressClickUntil.current) { event.preventDefault(); return }; onOpen(item) }} onKeyDown={(event) => { if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); onRequestDelete(item) } }} onPointerDown={(event) => handlePointerDown(event, item)} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={(event) => handleTouchStart(event, item)} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
+            <ArchivePolaroid item={item} lang={lang} t={t} />
           </button>
         ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
       </div>
+      <p className="visually-hidden" id="archive-delete-instructions">{t.archiveDeleteHint}</p>
+      {dragged ? <><div ref={previewRef} className="archive-card archive-drag-preview" style={{ left: dragged.rect.left, top: dragged.rect.top, width: dragged.rect.width, height: dragged.rect.height }} aria-hidden="true"><ArchivePolaroid item={dragged.item} lang={lang} t={t} /></div><div ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} role="status" aria-live="polite"><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong>{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></div></> : null}
     </section>
   )
+}
+
+function DeletePolaroidDialog({ day, lang, t, deleting, onCancel, onConfirm }) {
+  const cancelRef = useRef(null)
+
+  useEffect(() => {
+    if (!day) return undefined
+    const previousFocus = document.activeElement
+    requestAnimationFrame(() => cancelRef.current?.focus())
+    return () => previousFocus?.focus?.()
+  }, [day?.date])
+
+  function handleDialogKeyDown(event) {
+    if (event.key === 'Escape' && !deleting) {
+      event.preventDefault()
+      onCancel()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
+    if (!controls.length) return
+    const first = controls[0]
+    const last = controls.at(-1)
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
+  if (!day) return null
+  const displayDate = formatDate(day.date, lang, true)
+  return <div className="delete-confirm-scrim"><button className="delete-confirm-dismiss" type="button" onClick={onCancel} aria-label={t.cancelDelete} disabled={deleting} /><section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" onKeyDown={handleDialogKeyDown}><span className="delete-dialog-icon"><Icon name="trash" size={34} /></span><div><span className="chrome-kicker">DELETE POLAROID?</span><h2 id="delete-dialog-title">{t.deleteTitle}</h2><p id="delete-dialog-description">{formatText(t.deleteMessage, { date: displayDate })}</p></div><div className="delete-dialog-actions"><button ref={cancelRef} type="button" onClick={onCancel} disabled={deleting}>{t.cancelDelete}</button><button className="confirm-delete" type="button" onClick={onConfirm} disabled={deleting}><Icon name="trash" size={19} />{deleting ? t.deletingPolaroid : t.confirmDelete}</button></div></section></div>
 }
 
 function SettingsScreen({ lang, setLang, t }) {
@@ -731,6 +928,8 @@ export default function App() {
   const [finishing, setFinishing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [developedDay, setDevelopedDay] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deletingPolaroid, setDeletingPolaroid] = useState(false)
   const [message, setMessage] = useState('')
   const messageTimer = useRef(null)
   const date = useMemo(localDateKey, [])
@@ -912,6 +1111,28 @@ export default function App() {
     catch { showMessage(t.error) }
   }
 
+  function requestDeletePolaroid(target) {
+    setSelectedDay(null)
+    setPendingDelete(target)
+  }
+
+  async function confirmDeletePolaroid() {
+    const target = pendingDelete
+    if (!target || deletingPolaroid) return
+    setDeletingPolaroid(true)
+    try {
+      await deleteDay(target.date)
+      setHistory((current) => current.filter((item) => item.date !== target.date))
+      setSelectedDay((current) => current?.date === target.date ? null : current)
+      setDevelopedDay((current) => current?.date === target.date ? null : current)
+      if (target.date === date) setDay({ schemaVersion: 2, date, photos: {}, samples: {}, completedAt: null })
+      setPendingDelete(null)
+      navigator.vibrate?.([35, 45, 35])
+      showMessage(t.polaroidDeleted)
+    } catch { showMessage(t.error) }
+    finally { setDeletingPolaroid(false) }
+  }
+
   function startCompose() {
     if (count === 7 && !day?.completedAt) {
       setComposing(true)
@@ -925,7 +1146,7 @@ export default function App() {
   }
 
   const screen = activeTab === 'archive'
-    ? <ArchiveScreen history={history} lang={lang} t={t} onOpen={setSelectedDay} />
+    ? <ArchiveScreen history={history} lang={lang} t={t} onOpen={setSelectedDay} onRequestDelete={requestDeletePolaroid} />
     : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} />
       : staged
@@ -948,6 +1169,7 @@ export default function App() {
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
     <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
+    <DeletePolaroidDialog day={pendingDelete} lang={lang} t={t} deleting={deletingPolaroid} onCancel={() => { if (!deletingPolaroid) setPendingDelete(null) }} onConfirm={confirmDeletePolaroid} />
     <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
   </div>
 }
