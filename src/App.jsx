@@ -37,6 +37,7 @@ function localDateKey() {
 }
 
 function formatDate(date, lang, compact = false) {
+  if (compact && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date.replaceAll('-', '/')
   const locale = lang === 'zh-Hant' ? 'zh-TW' : lang
   return new Intl.DateTimeFormat(locale, compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00`))
 }
@@ -130,7 +131,7 @@ async function renderPolaroidImage(day, lang, fallbackCaption) {
   if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
   await document.fonts?.ready
   const width = 1000
-  const height = 1450
+  const height = 1500
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -187,13 +188,13 @@ async function renderPolaroidImage(day, lang, fallbackCaption) {
   const dateText = formatDate(day.date, lang, true)
   context.textBaseline = 'middle'
   context.fillStyle = '#241435'
-  context.font = '600 31px "Noto Sans TC", "Segoe UI", sans-serif'
-  const dateWidth = 180
-  context.fillText(fitCanvasText(context, caption, width - 100 - dateWidth), 50, 1393)
+  context.font = '600 45px "Noto Sans TC", "Segoe UI", sans-serif'
+  const dateWidth = 220
+  context.fillText(fitCanvasText(context, caption, width - 100 - dateWidth), 50, 1418)
   context.fillStyle = '#625c63'
-  context.font = '600 25px "Noto Sans TC", "Segoe UI", sans-serif'
+  context.font = '600 34px "Noto Sans TC", "Segoe UI", sans-serif'
   context.textAlign = 'right'
-  context.fillText(dateText, 950, 1393)
+  context.fillText(dateText, 950, 1418)
   context.textAlign = 'left'
   return canvas.toDataURL('image/png')
 }
