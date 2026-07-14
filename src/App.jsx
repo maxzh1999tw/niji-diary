@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
@@ -643,18 +644,30 @@ function ArchivePolaroid({ item, lang, t }) {
 }
 
 function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
-  const [dragged, setDragged] = useState(null)
+  const [deleteMode, setDeleteMode] = useState(null)
   const [overTrash, setOverTrash] = useState(false)
   const drag = useRef(null)
   const longPressTimer = useRef(null)
   const animationFrame = useRef(null)
   const previewRef = useRef(null)
   const trashRef = useRef(null)
+  const deleteDialogRef = useRef(null)
+  const nativeTouchHandlers = useRef(null)
+  const settleTimer = useRef(null)
   const suppressClickUntil = useRef(0)
+
+  useEffect(() => {
+    if (!deleteMode) return undefined
+    const previousFocus = document.activeElement
+    requestAnimationFrame(() => deleteDialogRef.current?.focus())
+    return () => previousFocus?.focus?.()
+  }, [deleteMode?.date])
 
   useEffect(() => () => {
     window.clearTimeout(longPressTimer.current)
+    window.clearTimeout(settleTimer.current)
     if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
+    detachNativeTouchListeners()
   }, [])
 
   function clearLongPress() {
@@ -666,8 +679,8 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     animationFrame.current = null
     const current = drag.current
     if (!current?.active || !previewRef.current) return
-    previewRef.current.style.setProperty('--drag-x', `${current.x - current.startX}px`)
-    previewRef.current.style.setProperty('--drag-y', `${current.y - current.startY}px`)
+    previewRef.current.style.setProperty('--drag-x', `${current.x - current.anchorX}px`)
+    previewRef.current.style.setProperty('--drag-y', `${current.y - current.anchorY}px`)
   }
 
   function queuePreviewPaint() {
@@ -679,12 +692,16 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     const current = drag.current
     if (!current || current.active) return
     current.active = true
+    current.anchorX = current.x
+    current.anchorY = current.y
     current.overTrash = false
     current.trashRect = null
     if (current.kind === 'pointer') {
       try { current.source.setPointerCapture?.(current.pointerId) } catch { /* Pointer may already be released. */ }
+    } else {
+      attachNativeTouchListeners()
     }
-    setDragged({ item: current.item, rect: current.source.getBoundingClientRect() })
+    setDeleteMode(current.item)
     setOverTrash(false)
     suppressClickUntil.current = Date.now() + 1000
     navigator.vibrate?.(18)
@@ -693,8 +710,59 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
 
   function beginPress(item, source, kind, pointerId, x, y) {
     clearLongPress()
-    drag.current = { item, source, kind, pointerId, startX: x, startY: y, x, y, active: false, overTrash: false, trashRect: null }
+    drag.current = { item, source, kind, pointerId, startX: x, startY: y, anchorX: x, anchorY: y, x, y, active: false, overTrash: false, trashRect: null }
     longPressTimer.current = window.setTimeout(activateDrag, 450)
+  }
+
+  function beginActiveDrag(item, source, kind, pointerId, x, y) {
+    clearLongPress()
+    window.clearTimeout(settleTimer.current)
+    if (previewRef.current) {
+      previewRef.current.classList.remove('settling')
+      previewRef.current.style.removeProperty('--drag-x')
+      previewRef.current.style.removeProperty('--drag-y')
+    }
+    drag.current = { item, source, kind, pointerId, startX: x, startY: y, anchorX: x, anchorY: y, x, y, active: true, overTrash: false, trashRect: null }
+    if (kind === 'pointer') {
+      try { source.setPointerCapture?.(pointerId) } catch { /* Pointer capture is best effort. */ }
+    } else {
+      attachNativeTouchListeners()
+    }
+    setOverTrash(false)
+  }
+
+  function detachNativeTouchListeners() {
+    const handlers = nativeTouchHandlers.current
+    if (!handlers) return
+    document.removeEventListener('touchmove', handlers.move)
+    document.removeEventListener('touchend', handlers.end)
+    document.removeEventListener('touchcancel', handlers.cancel)
+    nativeTouchHandlers.current = null
+  }
+
+  function attachNativeTouchListeners() {
+    detachNativeTouchListeners()
+    const handlers = {
+      move(event) {
+        const current = drag.current
+        if (!current || current.kind !== 'touch') return
+        const touch = findTouch(event.touches, current.pointerId)
+        if (touch) movePress(touch.clientX, touch.clientY, event)
+      },
+      end(event) {
+        const current = drag.current
+        if (!current || current.kind !== 'touch') return
+        const touch = findTouch(event.changedTouches, current.pointerId)
+        finishPress(touch?.clientX ?? current.x, touch?.clientY ?? current.y, true)
+      },
+      cancel() {
+        cancelPress()
+      },
+    }
+    nativeTouchHandlers.current = handlers
+    document.addEventListener('touchmove', handlers.move, { passive: false })
+    document.addEventListener('touchend', handlers.end)
+    document.addEventListener('touchcancel', handlers.cancel)
   }
 
   function pointIsOverTrash(x, y) {
@@ -727,6 +795,16 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     }
   }
 
+  function settlePreview() {
+    const preview = previewRef.current
+    if (!preview) return
+    preview.classList.add('settling')
+    preview.style.setProperty('--drag-x', '0px')
+    preview.style.setProperty('--drag-y', '0px')
+    window.clearTimeout(settleTimer.current)
+    settleTimer.current = window.setTimeout(() => preview.classList.remove('settling'), 260)
+  }
+
   function finishPress(x, y, requestDelete) {
     const current = drag.current
     if (!current) return
@@ -742,15 +820,25 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     }
     if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
     animationFrame.current = null
+    detachNativeTouchListeners()
     drag.current = null
-    setDragged(null)
     setOverTrash(false)
-    if (current.active && current.overTrash && requestDelete) onRequestDelete(current.item)
+    if (current.active && current.overTrash && requestDelete) {
+      setDeleteMode(null)
+      onRequestDelete(current.item)
+      return
+    }
+    if (current.active) settlePreview()
   }
 
   function cancelPress() {
     const current = drag.current
     if (!current) return
+    if (!current.active) {
+      clearLongPress()
+      drag.current = null
+      return
+    }
     finishPress(current.x, current.y, false)
   }
 
@@ -770,6 +858,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   function handleTouchMove(event) {
     const current = drag.current
     if (!current || current.kind !== 'touch') return
+    if (current.active && nativeTouchHandlers.current) return
     const touch = findTouch(event.touches, current.pointerId)
     if (touch) movePress(touch.clientX, touch.clientY, event)
   }
@@ -777,8 +866,15 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   function handleTouchEnd(event) {
     const current = drag.current
     if (!current || current.kind !== 'touch') return
+    if (current.active && nativeTouchHandlers.current) return
     const touch = findTouch(event.changedTouches, current.pointerId)
     finishPress(touch?.clientX ?? current.x, touch?.clientY ?? current.y, true)
+  }
+
+  function beginDeleteModeTouch(event) {
+    if (event.touches.length !== 1) return
+    const touch = event.touches[0]
+    beginActiveDrag(deleteMode, event.currentTarget, 'touch', touch.identifier, touch.clientX, touch.clientY)
   }
 
   function handlePointerDown(event, item) {
@@ -798,18 +894,40 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     finishPress(event.clientX, event.clientY, true)
   }
 
+  function beginDeleteModePointer(event) {
+    if (event.pointerType === 'touch' || event.button !== 0) return
+    event.preventDefault()
+    beginActiveDrag(deleteMode, event.currentTarget, 'pointer', event.pointerId, event.clientX, event.clientY)
+  }
+
+  function closeDeleteMode() {
+    if (drag.current?.active) return
+    setDeleteMode(null)
+    setOverTrash(false)
+  }
+
+  function handleDeleteModeKeyDown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeDeleteMode()
+    } else if (event.key === 'Tab') {
+      event.preventDefault()
+      trashRef.current?.focus()
+    }
+  }
+
   return (
-    <section className={`archive-screen screen-enter ${dragged ? 'archive-dragging' : ''}`} aria-labelledby="archive-title">
+    <section className="archive-screen screen-enter" aria-labelledby="archive-title">
       <div className="screen-title"><span className="chrome-kicker">POLAROID ALBUM</span><h1 id="archive-title">{t.archiveTitle}</h1><p>{formatText(t.rainbowCount, { count: history.length })}</p></div>
       <div className="archive-scroll-region" role="region" aria-label={t.albumListLabel} tabIndex={0}>
         {history.length ? <div className="archive-grid">{history.map((item) => (
-          <button type="button" className={`archive-card ${dragged?.item.date === item.date ? 'drag-origin' : ''}`} key={item.date} aria-describedby="archive-delete-instructions" aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} onClick={(event) => { if (Date.now() < suppressClickUntil.current) { event.preventDefault(); return }; onOpen(item) }} onKeyDown={(event) => { if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); onRequestDelete(item) } }} onPointerDown={(event) => handlePointerDown(event, item)} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={(event) => handleTouchStart(event, item)} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
+          <button type="button" className="archive-card" key={item.date} aria-describedby="archive-delete-instructions" aria-label={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} onClick={(event) => { if (Date.now() < suppressClickUntil.current) { event.preventDefault(); return }; onOpen(item) }} onKeyDown={(event) => { if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); setDeleteMode(item) } }} onPointerDown={(event) => handlePointerDown(event, item)} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={(event) => handleTouchStart(event, item)} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}>
             <ArchivePolaroid item={item} lang={lang} t={t} />
           </button>
         ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
       </div>
       <p className="visually-hidden" id="archive-delete-instructions">{t.archiveDeleteHint}</p>
-      {dragged ? <><div ref={previewRef} className="archive-card archive-drag-preview" style={{ left: dragged.rect.left, top: dragged.rect.top, width: dragged.rect.width, height: dragged.rect.height }} aria-hidden="true"><ArchivePolaroid item={dragged.item} lang={lang} t={t} /></div><div ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} role="status" aria-live="polite"><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong>{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></div></> : null}
+      {deleteMode ? createPortal(<div className="archive-delete-overlay"><button className="archive-delete-dismiss" type="button" onClick={closeDeleteMode} aria-label={t.close} tabIndex="-1" /><section ref={deleteDialogRef} className="archive-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-delete-date" tabIndex="-1" onKeyDown={handleDeleteModeKeyDown}><h2 className="visually-hidden" id="archive-delete-date">{formatDate(deleteMode.date, lang)}</h2><div ref={previewRef} className="archive-delete-polaroid" onPointerDown={beginDeleteModePointer} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={beginDeleteModeTouch} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress}><ArchivePolaroid item={deleteMode} lang={lang} t={t} /></div><button ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} type="button" onClick={() => { if (!drag.current?.active) { setDeleteMode(null); onRequestDelete(deleteMode) } }} aria-label={t.dragToDelete}><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong aria-live="polite">{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></button></section></div>, document.body) : null}
     </section>
   )
 }
