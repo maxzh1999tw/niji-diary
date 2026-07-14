@@ -665,6 +665,15 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     return () => previousFocus?.focus?.()
   }, [deleteMode?.date])
 
+  useEffect(() => {
+    function preventNativeLongPressMenu(event) {
+      if (event.target?.closest?.('.archive-card, .archive-delete-polaroid')) event.preventDefault()
+    }
+
+    document.addEventListener('contextmenu', preventNativeLongPressMenu, true)
+    return () => document.removeEventListener('contextmenu', preventNativeLongPressMenu, true)
+  }, [])
+
   useEffect(() => () => {
     window.clearTimeout(longPressTimer.current)
     window.clearTimeout(settleTimer.current)
@@ -777,6 +786,19 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     return Boolean(rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom)
   }
 
+  function aimPreviewAtTrash(current) {
+    const preview = previewRef.current
+    const trash = trashRef.current
+    if (!preview || !trash) return
+
+    preview.style.setProperty('--drag-x', `${current.x - current.anchorX}px`)
+    preview.style.setProperty('--drag-y', `${current.y - current.anchorY}px`)
+    const previewRect = preview.getBoundingClientRect()
+    const trashRect = current.trashRect ?? trash.getBoundingClientRect()
+    preview.style.setProperty('--trash-origin-x', `${trashRect.left + trashRect.width / 2 - previewRect.left}px`)
+    preview.style.setProperty('--trash-origin-y', `${trashRect.top + trashRect.height / 2 - previewRect.top}px`)
+  }
+
   function movePress(x, y, event) {
     const current = drag.current
     if (!current) return
@@ -794,6 +816,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     const nextOverTrash = pointIsOverTrash(x, y)
     if (nextOverTrash !== current.overTrash) {
       current.overTrash = nextOverTrash
+      if (nextOverTrash) aimPreviewAtTrash(current)
       setOverTrash(nextOverTrash)
       if (nextOverTrash) navigator.vibrate?.(24)
     }
@@ -967,7 +990,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
         ))}</div> : <div className="empty-archive"><div className="empty-disc"><Icon name="sparkle" size={42} /></div><h2>{t.noRainbows}</h2><p>{t.noRainbowsHint}</p></div>}
       </div>
       <p className="visually-hidden" id="archive-delete-instructions">{t.archiveDeleteHint}</p>
-      {deleteMode ? createPortal(<div className="archive-delete-overlay"><button className="archive-delete-dismiss" type="button" onClick={closeDeleteMode} aria-label={t.close} tabIndex="-1" /><section ref={deleteDialogRef} className="archive-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-delete-date" tabIndex="-1" onKeyDown={handleDeleteModeKeyDown}><h2 className="visually-hidden" id="archive-delete-date">{formatDate(deleteMode.date, lang)}</h2><div ref={previewRef} className={`archive-delete-polaroid ${overTrash ? 'over-trash' : ''}`} onPointerDown={beginDeleteModePointer} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={beginDeleteModeTouch} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress}><ArchivePolaroid item={deleteMode} lang={lang} t={t} /></div><button ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} type="button" onClick={() => { if (!drag.current?.active) animatePreviewToTrash(deleteMode) }} aria-label={t.dragToDelete}><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong aria-live="polite">{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></button></section></div>, document.body) : null}
+      {deleteMode ? createPortal(<div className="archive-delete-overlay"><button className="archive-delete-dismiss" type="button" onClick={closeDeleteMode} aria-label={t.close} tabIndex="-1" /><section ref={deleteDialogRef} className="archive-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-delete-date" tabIndex="-1" onKeyDown={handleDeleteModeKeyDown}><h2 className="visually-hidden" id="archive-delete-date">{formatDate(deleteMode.date, lang)}</h2><div ref={previewRef} className={`archive-delete-polaroid ${overTrash ? 'over-trash' : ''}`} onPointerDown={beginDeleteModePointer} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPress} onTouchStart={beginDeleteModeTouch} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={cancelPress} onContextMenu={(event) => event.preventDefault()} onDragStart={(event) => event.preventDefault()}><ArchivePolaroid item={deleteMode} lang={lang} t={t} /></div><button ref={trashRef} className={`album-delete-tray ${overTrash ? 'over-trash' : ''}`} type="button" onClick={() => { if (!drag.current?.active) animatePreviewToTrash(deleteMode) }} aria-label={t.dragToDelete}><span className="album-trash-icon"><Icon name="trash" size={34} /></span><strong aria-live="polite">{overTrash ? t.releaseToDelete : t.dragToDelete}</strong></button></section></div>, document.body) : null}
     </section>
   )
 }
