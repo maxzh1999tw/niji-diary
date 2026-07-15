@@ -514,11 +514,18 @@ function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, 
         ) : count === 7 ? (
           <button className="y2k-button finish" type="button" onClick={onStartCompose}><Icon name="sparkle" />{t.createRainbowCard}</button>
         ) : (
-          <label className="capture-button">
-            <input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />
-            <span className="capture-lens"><Icon name="camera" size={30} /></span>
-            <span><b>{t.takePhoto}</b><small>{t.thenPickColor}</small></span>
-          </label>
+          <div className="capture-source-actions">
+            <label className="capture-button camera-capture">
+              <input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />
+              <span className="capture-lens"><Icon name="camera" size={30} /></span>
+              <span><b>{t.takePhoto}</b><small>{t.thenPickColor}</small></span>
+            </label>
+            <label className="capture-button upload-capture">
+              <input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} />
+              <span className="capture-lens"><Icon name="upload" size={21} /></span>
+              <b>{t.uploadPhoto}</b>
+            </label>
+          </div>
         )}
       </div>
     </section>
