@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
-import { deleteDay, getCompletedDays, getDay, saveDay } from './storage.js'
+import { completeDraft, deleteDay, loadCollectionState, requestPersistentStorage, saveDay, saveDraft } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
 const TAB_KEYS = ['today', 'archive', 'settings']
@@ -36,6 +36,10 @@ function Icon({ name, size = 24 }) {
 function localDateKey() {
   const now = new Date()
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
+
+function createEmptyDraft() {
+  return { schemaVersion: 3, photos: {}, samples: {}, completedAt: null }
 }
 
 function formatDate(date, lang, compact = false) {
@@ -482,10 +486,10 @@ function FullscreenSampler({ staged, t, onClose, onSample }) {
   </section>
 }
 
-function TodayScreen({ day, count, date, lang, t, loading, onCapture, onRemove, onStartCompose }) {
+function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCapture, onRemove, onStartCompose }) {
   const photos = day?.photos ?? {}
   const samples = day?.samples ?? {}
-  const isComplete = Boolean(day?.completedAt)
+  const isComplete = dailyLocked
   return (
     <section className="today-screen screen-enter" aria-labelledby="today-title">
       <div className="mission-head">
@@ -1103,6 +1107,7 @@ export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('niji-language') || 'zh-Hant')
   const [activeTab, setActiveTab] = useState(() => TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'today')
   const [day, setDay] = useState(null)
+  const [dailyLocked, setDailyLocked] = useState(false)
   const [history, setHistory] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
   const [staged, setStaged] = useState(QA_SAMPLE)
@@ -1120,7 +1125,7 @@ export default function App() {
   const [deletingPolaroid, setDeletingPolaroid] = useState(false)
   const [message, setMessage] = useState('')
   const messageTimer = useRef(null)
-  const date = useMemo(localDateKey, [])
+  const [date, setDate] = useState(localDateKey)
   const t = translations[lang]
   const photos = day?.photos ?? {}
   const count = COLOR_KEYS.reduce((total, key) => total + (photos[key] ? 1 : 0), 0)
@@ -1137,6 +1142,17 @@ export default function App() {
   }, [lang])
 
   useEffect(() => {
+    const syncDate = () => setDate(localDateKey())
+    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') syncDate() }
+    const interval = window.setInterval(syncDate, 60_000)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
     const syncHash = () => { const next = location.hash.slice(1); if (TAB_KEYS.includes(next)) setActiveTab(next) }
     window.addEventListener('hashchange', syncHash)
     if (!location.hash) window.history.replaceState(null, '', '#today')
@@ -1150,16 +1166,20 @@ export default function App() {
       const qaDay = { schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, cardImage: qaCompleted ? './rainbow.svg' : undefined, completedAt: qaCompleted ? new Date().toISOString() : null }
       const qaAlbum = QA_MODE === 'album' ? Array.from({ length: 12 }, (_, index) => ({ ...qaDay, date: `2026-07-${String(13 - index).padStart(2, '0')}` })) : []
       setDay(qaDay)
+      setDailyLocked(qaCompleted)
       if (QA_MODE === 'result') setDevelopedDay(qaDay)
       setHistory(QA_MODE === 'album' ? qaAlbum : QA_MODE === 'result' ? [qaDay] : [])
       setLoading(false)
       return undefined
     }
     let active = true
-    Promise.all([getDay(date), getCompletedDays()]).then(([savedDay, savedHistory]) => {
+    setLoading(true)
+    loadCollectionState(date).then(({ completedToday, completedDays, dailyLocked: savedDailyLock, draft }) => {
       if (!active) return
-      setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : { schemaVersion: 2, date, photos: {}, samples: {}, completedAt: null })
-      setHistory(savedHistory)
+      const savedDay = completedToday ?? draft
+      setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft())
+      setDailyLocked(savedDailyLock)
+      setHistory(completedDays)
     }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) setLoading(false) })
     return () => { active = false; clearTimeout(messageTimer.current) }
   }, [date])
@@ -1174,7 +1194,7 @@ export default function App() {
   }
 
   async function handleCapture(file, input) {
-    if (!file || day?.completedAt) return
+    if (!file || dailyLocked) return
     setProcessing(true)
     try {
       const result = await processPhoto(file)
@@ -1186,14 +1206,14 @@ export default function App() {
   }
 
   async function confirmColor() {
-    if (!staged) return
-    const nextDay = { ...day, schemaVersion: 2, photos: { ...photos, [selectedColor]: staged.image }, samples: { ...(day.samples ?? {}), [selectedColor]: staged.sampleColor } }
+    if (!staged || dailyLocked) return
+    const nextDay = { ...day, schemaVersion: 3, photos: { ...photos, [selectedColor]: staged.image }, samples: { ...(day.samples ?? {}), [selectedColor]: staged.sampleColor } }
     setDay(nextDay)
     setStaged(null)
     setSamplerOpen(false)
     navigator.vibrate?.([25, 35, 25])
     showMessage(formatText(t.colorAdded, { color: t.colors[COLOR_KEYS.indexOf(selectedColor)] }))
-    try { await saveDay(nextDay) } catch { showMessage(t.error) }
+    try { await Promise.all([saveDraft(nextDay), requestPersistentStorage()]) } catch { showMessage(t.error) }
     if (COLOR_KEYS.every((key) => nextDay.photos[key])) {
       setComposing(true)
       resetAppViewport()
@@ -1208,13 +1228,13 @@ export default function App() {
   }
 
   async function removeColor(key) {
-    if (!photos[key] || day?.completedAt) return
+    if (!photos[key] || dailyLocked) return
     if (!window.confirm(formatText(t.removeConfirm, { color: t.colors[COLOR_KEYS.indexOf(key)] }))) return
     const nextPhotos = { ...photos }; delete nextPhotos[key]
     const nextSamples = { ...(day.samples ?? {}) }; delete nextSamples[key]
     const nextDay = { ...day, photos: nextPhotos, samples: nextSamples }
     setDay(nextDay)
-    try { await saveDay(nextDay) } catch { showMessage(t.error) }
+    try { await saveDraft(nextDay) } catch { showMessage(t.error) }
   }
 
   async function handleBackground(file, input) {
@@ -1229,12 +1249,15 @@ export default function App() {
   }
 
   async function finishRainbowCard() {
-    if (!background || finishing || count !== 7 || day?.completedAt) return
+    if (!background || finishing || count !== 7 || dailyLocked) return
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const completedDay = { ...day, schemaVersion: 2, cardImage, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const completedDay = { ...day, schemaVersion: 3, date, cardImage, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      await completeDraft(completedDay, date)
+      await requestPersistentStorage()
       setDay(completedDay)
+      setDailyLocked(true)
       setHistory((current) => [completedDay, ...current.filter((item) => item.date !== date)])
       setDevelopedDay(completedDay)
       setComposing(false)
@@ -1242,7 +1265,6 @@ export default function App() {
       navigator.vibrate?.([50, 50, 100])
       showMessage(t.rainbowCompleteToast)
       resetAppViewport()
-      await saveDay(completedDay)
     } catch { showMessage(t.error) }
     finally { setFinishing(false) }
   }
@@ -1313,7 +1335,7 @@ export default function App() {
       setHistory((current) => current.filter((item) => item.date !== target.date))
       setSelectedDay((current) => current?.date === target.date ? null : current)
       setDevelopedDay((current) => current?.date === target.date ? null : current)
-      if (target.date === date) setDay({ schemaVersion: 2, date, photos: {}, samples: {}, completedAt: null })
+      if (target.date === date) setDay(createEmptyDraft())
       setPendingDelete(null)
       navigator.vibrate?.([35, 45, 35])
       showMessage(t.polaroidDeleted)
@@ -1322,7 +1344,7 @@ export default function App() {
   }
 
   function startCompose() {
-    if (count === 7 && !day?.completedAt) {
+    if (count === 7 && !dailyLocked) {
       setComposing(true)
       resetAppViewport()
     }
@@ -1341,7 +1363,7 @@ export default function App() {
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
           ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} t={t} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
-          : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
+          : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged
 
