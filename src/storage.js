@@ -53,12 +53,15 @@ export function deriveCollectionState(records, today) {
   const legacyDrafts = records
     .filter((record) => CALENDAR_DATE_PATTERN.test(record.date) && !record.completedAt)
     .sort((a, b) => a.date.localeCompare(b.date))
+  const todayLegacyDraft = legacyDrafts.find((record) => record.date === today)
+  const draftSource = activeDraft ?? todayLegacyDraft
 
   return {
     completedDays,
     completedToday,
     dailyLocked: Boolean(completedToday || completionGate?.lastCompletedDate === today),
-    draft: activeDraft ? { ...activeDraft, schemaVersion: 3, completedAt: null } : null,
+    draft: draftSource ? { ...draftSource, schemaVersion: 3, date: ACTIVE_DRAFT_KEY, completedAt: null } : null,
+    draftNeedsMigration: !activeDraft && Boolean(todayLegacyDraft),
     legacyDraftKeys: legacyDrafts.map((record) => record.date),
   }
 }
@@ -68,6 +71,7 @@ export async function loadCollectionState(today) {
   const state = deriveCollectionState(records, today)
 
   if (state.legacyDraftKeys.length) {
+    if (state.draftNeedsMigration) await saveDraft(state.draft)
     await deleteRecords(state.legacyDraftKeys)
   }
 

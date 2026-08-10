@@ -22,6 +22,17 @@ const legacyOnlyState = deriveCollectionState(legacyRecords, '2026-08-10')
 assert.equal(legacyOnlyState.draft, null)
 assert.deepEqual(legacyOnlyState.legacyDraftKeys, ['2026-08-01', '2026-08-07'])
 
+const todayLegacyDraft = { date: '2026-08-10', photos: { green: 'today-green' }, samples: { green: '#00aa55' }, completedAt: null }
+const todayMigrationState = deriveCollectionState([...legacyRecords, todayLegacyDraft], '2026-08-10')
+assert.equal(todayMigrationState.draftNeedsMigration, true)
+assert.equal(todayMigrationState.draft.date, ACTIVE_DRAFT_KEY)
+assert.deepEqual(todayMigrationState.draft.photos, { green: 'today-green' })
+assert.deepEqual(todayMigrationState.draft.samples, { green: '#00aa55' })
+
+const activeWinsState = deriveCollectionState([...legacyRecords, todayLegacyDraft, activeDraft], '2026-08-10')
+assert.equal(activeWinsState.draftNeedsMigration, false)
+assert.deepEqual(activeWinsState.draft.photos, { red: 'active-red' })
+
 const deletedPolaroidState = deriveCollectionState([
   activeDraft,
   { date: '__completion-gate__', lastCompletedDate: '2026-08-10' },
@@ -29,4 +40,4 @@ const deletedPolaroidState = deriveCollectionState([
 assert.equal(deletedPolaroidState.completedToday, null)
 assert.equal(deletedPolaroidState.dailyLocked, true)
 
-console.log('Storage model: draft persists across dates, legacy incomplete colors reset, and daily completion remains locked.')
+console.log("Storage model: today's legacy draft migrates alone, older drafts reset, and daily completion remains locked.")
