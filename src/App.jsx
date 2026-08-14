@@ -208,7 +208,10 @@ async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = 
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
-  const filmSurface = await loadImageSource(renderModel.surfaceUrl)
+  const [filmSurface, filmOverlay] = await Promise.all([
+    loadImageSource(renderModel.surfaceUrl),
+    loadImageSource(renderModel.overlayUrl),
+  ])
   context.drawImage(filmSurface, 0, 0, width, height)
 
   const mainImage = await loadImageSource(day.cardImage)
@@ -243,6 +246,9 @@ async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = 
     context.fillRect(x, sources.y + sources.height - sources.accentHeight, sourceWidth, sources.accentHeight)
   })
 
+  // Keep the canvas layer order identical to PolaroidCard: paper, photo/sources,
+  // edge decorations, then footer text.
+  context.drawImage(filmOverlay, 0, 0, width, height)
   if (includeCaption) drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout)
   drawPolaroidDate(context, day, lang, renderModel.layout)
   return canvas.toDataURL('image/jpeg', 0.9)
@@ -410,8 +416,8 @@ function FilmPhotoPlaceholder() {
 }
 
 function FilmSurface({ filmId }) {
-  const { surfaceUrl } = getFilmRenderModel(filmId)
-  return <img className="film-surface-artwork" src={surfaceUrl} alt="" aria-hidden="true" draggable="false" />
+  const { surfaceUrl, overlayUrl } = getFilmRenderModel(filmId)
+  return <><img className="film-surface-artwork" src={surfaceUrl} alt="" aria-hidden="true" draggable="false" /><img className="film-surface-overlay" src={overlayUrl} alt="" aria-hidden="true" draggable="false" /></>
 }
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {

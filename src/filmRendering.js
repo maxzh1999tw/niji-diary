@@ -25,17 +25,29 @@ function escapeAttribute(value) {
 }
 
 function renderArtworkShape(shape, accent) {
-  const common = `fill="${escapeAttribute(accent)}" opacity="${shape.opacity ?? 1}"`
+  const fill = shape.fill === 'none' ? 'none' : (shape.fill ?? accent)
+  const stroke = shape.stroke === 'accent' ? accent : shape.stroke
+  const paint = [
+    `fill="${escapeAttribute(fill)}"`,
+    stroke ? `stroke="${escapeAttribute(stroke)}"` : '',
+    stroke && shape.strokeWidth ? `stroke-width="${shape.strokeWidth}"` : '',
+    stroke && shape.strokeLinecap ? `stroke-linecap="${escapeAttribute(shape.strokeLinecap)}"` : '',
+    stroke && shape.strokeLinejoin ? `stroke-linejoin="${escapeAttribute(shape.strokeLinejoin)}"` : '',
+    `opacity="${shape.opacity ?? 1}"`,
+  ].filter(Boolean).join(' ')
   if (shape.type === 'circle') {
-    return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.radius}" ${common}/>`
+    return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.radius}" ${paint}/>`
   }
   if (shape.type === 'ellipse') {
-    return `<ellipse cx="${shape.cx}" cy="${shape.cy}" rx="${shape.radiusX}" ry="${shape.radiusY}" transform="rotate(${shape.rotation ?? 0} ${shape.cx} ${shape.cy})" ${common}/>`
+    return `<ellipse cx="${shape.cx}" cy="${shape.cy}" rx="${shape.radiusX}" ry="${shape.radiusY}" transform="rotate(${shape.rotation ?? 0} ${shape.cx} ${shape.cy})" ${paint}/>`
   }
   if (shape.type === 'rect') {
     const x = shape.cx - shape.width / 2
     const y = shape.cy - shape.height / 2
-    return `<rect x="${x}" y="${y}" width="${shape.width}" height="${shape.height}" transform="rotate(${shape.rotation ?? 0} ${shape.cx} ${shape.cy})" ${common}/>`
+    return `<rect x="${x}" y="${y}" width="${shape.width}" height="${shape.height}" transform="rotate(${shape.rotation ?? 0} ${shape.cx} ${shape.cy})" ${paint}/>`
+  }
+  if (shape.type === 'path') {
+    return `<path d="${escapeAttribute(shape.d)}" ${paint}/>`
   }
   return ''
 }
@@ -43,8 +55,14 @@ function renderArtworkShape(shape, accent) {
 export function createFilmSurfaceSvg(filmId) {
   const film = getFilm(filmId)
   const stops = PAPER_STOPS.map(({ offset, colorKey }) => `<stop offset="${offset * 100}%" stop-color="${escapeAttribute(film.paper[colorKey])}"/>`).join('')
-  const artwork = film.artwork.map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
+  const artwork = film.artwork.filter((shape) => shape.layer !== 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="paper" x1="0" y1="0" x2="${POLAROID_LAYOUT.width}" y2="${POLAROID_LAYOUT.height}" gradientUnits="userSpaceOnUse">${stops}</linearGradient></defs><rect width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}" fill="url(#paper)"/>${artwork}</svg>`
+}
+
+export function createFilmOverlaySvg(filmId) {
+  const film = getFilm(filmId)
+  const artwork = film.artwork.filter((shape) => shape.layer === 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet">${artwork}</svg>`
 }
 
 export function getFilmRenderModel(filmId) {
@@ -53,11 +71,14 @@ export function getFilmRenderModel(filmId) {
   if (cached) return cached
 
   const svg = createFilmSurfaceSvg(film.id)
+  const overlaySvg = createFilmOverlaySvg(film.id)
   const model = Object.freeze({
     film,
     layout: POLAROID_LAYOUT,
     svg,
+    overlaySvg,
     surfaceUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    overlayUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(overlaySvg)}`,
   })
   renderModelCache.set(film.id, model)
   return model
