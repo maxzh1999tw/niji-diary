@@ -41,9 +41,11 @@ assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).overlaySvg.includes('<path'), f
 
 const skyModel = getFilmRenderModel('sky-blue')
 assert.equal((skyModel.svg.match(/<circle /g) ?? []).length, 6)
+assert.equal((skyModel.overlaySvg.match(/<circle /g) ?? []).length, 6)
 assert.equal(skyModel.svg.includes('<path'), false, 'sky-blue artwork must use circular bubbles only')
+assert.equal(skyModel.overlaySvg.includes('<path'), false, 'sky-blue edge artwork must use circular bubbles only')
 assert.equal((skyModel.svg + skyModel.overlaySvg).includes('<ellipse'), false, 'sky-blue circles must stay circles at every render size')
-assert.equal(skyModel.overlaySvg.includes('frame-only'), false, 'sky-blue decoration stays clear of the photo without a foreground layer')
+assert.equal(skyModel.overlaySvg.includes('frame-only'), true, 'sky-blue edge bubbles must be clipped to the paper frame')
 assert.match(skyModel.svg, /fill="none" stroke="#56c9df"/)
 assert.match(getFilmRenderModel('pink-pop').svg, /<path d="M 665 1405/)
 assert.match(getFilmRenderModel('mint-green').svg, /stroke-linecap="round"/)

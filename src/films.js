@@ -24,6 +24,12 @@ export const FILMS = [
     unlock: { type: 'completed-count', target: 1 },
     paper: { top: '#f3fcff', middle: '#d9f6ff', bottom: '#bfeaf5', accent: '#56c9df' },
     artwork: [
+      { type: 'circle', layer: 'foreground', cx: 32, cy: 190, radius: 29, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.34 },
+      { type: 'circle', layer: 'foreground', cx: 27, cy: 510, radius: 17, opacity: 0.24 },
+      { type: 'circle', layer: 'foreground', cx: 35, cy: 870, radius: 24, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.3 },
+      { type: 'circle', layer: 'foreground', cx: 968, cy: 330, radius: 26, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.32 },
+      { type: 'circle', layer: 'foreground', cx: 973, cy: 650, radius: 17, opacity: 0.24 },
+      { type: 'circle', layer: 'foreground', cx: 966, cy: 1000, radius: 32, fill: 'none', stroke: 'accent', strokeWidth: 9, opacity: 0.34 },
       { type: 'circle', cx: 78, cy: 1334, radius: 32, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.3 },
       { type: 'circle', cx: 143, cy: 1380, radius: 48, fill: 'none', stroke: 'accent', strokeWidth: 10, opacity: 0.26 },
       { type: 'circle', cx: 205, cy: 1305, radius: 15, opacity: 0.22 },
