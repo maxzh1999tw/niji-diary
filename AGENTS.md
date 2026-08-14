@@ -21,3 +21,36 @@
 
 - 全站可見文字的 CSS 計算字級不得小於 12px；包含手機版、徽章、輔助說明、按鈕、時間、預覽與狀態文字。
 - 新增或調整文字時優先使用 12px 以上；不得以縮小文字換取版面容納，應改用換行、間距或版面調整。
+
+## Cloudflare Pages 部署資訊
+
+- Cloudflare Pages 專案：`niji-diary`
+- Cloudflare 帳戶 ID：`10a8a3c91b60c03a4073bee79dccb28f`
+- 建置指令：`npm run build`
+- 建置輸出目錄：`docs/`
+- 正式站：<https://niji.mia-and-max.com>
+- 測試站：<https://test.niji-diary.pages.dev>
+- 測試部署使用 Pages 預覽分支 `test`；正式部署使用 Pages production deployment。
+
+### GitHub Actions 部署流程
+
+- `.github/workflows/deploy-release.yml`
+  - 觸發條件：推送符合 `v*` 的 release tag。
+  - 流程：`npm ci` → `npm test` → `npm run build`，接著部署正式站與 `test` 測試站。
+- `.github/workflows/deploy-test.yml`
+  - 觸發條件：手動 `workflow_dispatch`。
+  - 輸入欄位：`ref`，可指定 branch、tag 或 commit，預設為 `main`。
+  - 流程：以指定 ref 建置，部署至 `test` 測試站。
+
+### GitHub Actions Secrets
+
+- `CLOUDFLARE_API_TOKEN`：Cloudflare API Token；僅授予帳戶層級的 Pages 編輯權限。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 帳戶 ID。
+- Secret 值不得寫入程式碼、文件、commit、issue 或 workflow log；只能透過 GitHub Repository Secrets 使用。
+- API Token 有效期限與權限異動時，需同步更新 GitHub Secret，並重新執行測試站 Action 驗證部署。
+
+### 部署維護注意事項
+
+- Wrangler 部署指令為 `pages deploy docs --project-name=niji-diary`；測試站額外加上 `--branch=test`。
+- 修改部署流程後，至少確認 `npm test`、`npm run build`，並手動執行測試站 workflow。
+- 部署完成後確認正式站與測試站皆可正常回應，且不可清除或覆寫使用者既有資料。
