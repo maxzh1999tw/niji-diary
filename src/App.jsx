@@ -388,7 +388,7 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
     exiting.current = true
     clearAutoDismiss()
     const node = noticeRef.current
-    node?.classList.remove('is-dragging')
+    node?.classList.remove('is-dragging', 'is-visible')
     node?.classList.add('is-exiting')
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 240
     exitTimer.current = window.setTimeout(() => onDismissRef.current(), delay)
@@ -396,8 +396,18 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
 
   useEffect(() => {
     exiting.current = false
-    scheduleAutoDismiss()
+    const node = noticeRef.current
+    node?.classList.remove('is-visible', 'is-exiting')
+    let visibleFrame = null
+    const mountedFrame = window.requestAnimationFrame(() => {
+      visibleFrame = window.requestAnimationFrame(() => {
+        node?.classList.add('is-visible')
+        scheduleAutoDismiss()
+      })
+    })
     return () => {
+      window.cancelAnimationFrame(mountedFrame)
+      if (visibleFrame !== null) window.cancelAnimationFrame(visibleFrame)
       window.clearTimeout(autoDismissTimer.current)
       window.clearTimeout(exitTimer.current)
     }
