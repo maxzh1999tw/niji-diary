@@ -242,11 +242,14 @@ img { max-width: 100%; }
     position: absolute;
     z-index: 2;
     top: 0;
-    right: 0;
+    right: -6px;
     width: max-content;
     max-width: calc(100% - 2px);
   }
 }
+
+.film-grid { align-items: start; }
+.film-card.unlocked { min-height: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

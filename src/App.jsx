@@ -1152,7 +1152,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
           <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><div className="film-status">{isSelected ? <><Icon name="check" size={13} /><span>{t.filmSelected}</span></> : isUnlocked ? <><Icon name="check" size={13} /><span>{t.filmUnlocked}</span></> : <><Icon name="lock" size={13} /><span>{t.filmLocked}</span></>}</div></div>
           <h2>{t[film.nameKey]}</h2>
-          <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
+          {!isUnlocked ? <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div> : null}
           {!isUnlocked ? <div className="film-progress"><div><span>{formatText(t.filmProgress, progress)}</span><b>{progress.current}/{progress.target}</b></div><i><em style={{ width: `${progress.target ? Math.min(100, progress.current / progress.target * 100) : 100}%` }} /></i></div> : null}
           {isUnlocked && !isSelected ? <button className="film-use-button" type="button" onClick={() => onSelectFilm(film.id)}>{t.useFilm}</button> : null}
         </article>
