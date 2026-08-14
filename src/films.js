@@ -141,6 +141,22 @@ export function getFilmProgress(film, completedDays = []) {
   return { current: Math.min(current, target), target, met: current >= target }
 }
 
+export function getFilmProgressChanges(previousCompletedDays = [], nextCompletedDays = []) {
+  return FILMS.flatMap((film) => {
+    if (film.unlock.type === 'always') return []
+    const previous = getFilmProgress(film, previousCompletedDays)
+    const next = getFilmProgress(film, nextCompletedDays)
+    if (next.current <= previous.current) return []
+    return [{
+      filmId: film.id,
+      previous: previous.current,
+      current: next.current,
+      target: next.target,
+      unlocked: !previous.met && next.met,
+    }]
+  })
+}
+
 export function getDerivedUnlockedFilmIds(completedDays = []) {
   return FILMS
     .filter((film) => getFilmProgress(film, completedDays).met)

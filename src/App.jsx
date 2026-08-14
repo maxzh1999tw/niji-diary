@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
-import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, normalizeFilmCollection } from './films.js'
+import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
@@ -59,6 +59,14 @@ function createDefaultFilmCollection() {
   const collection = withoutFilmCollectionMeta(normalizeFilmCollection(null))
   if (!QA_MODE || !FILMS.some((film) => film.id === QA_FILM_ID)) return collection
   return { ...collection, unlockedFilmIds: FILMS.map((film) => film.id), selectedFilmId: QA_FILM_ID }
+}
+
+function createQaFilmNotifications() {
+  if (QA_MODE !== 'film-notification') return []
+  const film = getFilm(FILMS.some((item) => item.id === QA_FILM_ID && item.unlock.type !== 'always') ? QA_FILM_ID : 'pink-pop')
+  const unlocked = DEV_QUERY?.get('unlocked') === '1'
+  const current = unlocked ? film.unlock.target : Math.max(1, film.unlock.target - 1)
+  return [{ id: `qa-${film.id}-${unlocked ? 'unlocked' : 'progress'}`, filmId: film.id, previous: Math.max(0, current - 1), current, target: film.unlock.target, unlocked }]
 }
 
 function readPendingFilmSelection() {
@@ -345,6 +353,115 @@ function FilmSurface({ filmId }) {
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
   return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder /></PolaroidCard>
+}
+
+function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDismiss }) {
+  const noticeRef = useRef(null)
+  const pointer = useRef(null)
+  const autoDismissTimer = useRef(null)
+  const exitTimer = useRef(null)
+  const exiting = useRef(false)
+  const suppressClick = useRef(false)
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
+
+  const film = getFilm(notification.filmId)
+  const progressPercent = notification.target ? Math.min(100, notification.current / notification.target * 100) : 100
+  const statusLabel = notification.unlocked ? t.filmNoticeUnlocked : t.filmNoticeProgress
+  const announcement = formatText(notification.unlocked ? t.filmNoticeUnlockedAnnouncement : t.filmNoticeProgressAnnouncement, {
+    name: t[film.nameKey],
+    current: notification.current,
+    target: notification.target,
+  })
+
+  function clearAutoDismiss() {
+    window.clearTimeout(autoDismissTimer.current)
+  }
+
+  function scheduleAutoDismiss(delay = 5200) {
+    clearAutoDismiss()
+    if (!exiting.current) autoDismissTimer.current = window.setTimeout(beginDismiss, delay)
+  }
+
+  function beginDismiss() {
+    if (exiting.current) return
+    exiting.current = true
+    clearAutoDismiss()
+    const node = noticeRef.current
+    node?.classList.remove('is-dragging')
+    node?.classList.add('is-exiting')
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 240
+    exitTimer.current = window.setTimeout(() => onDismissRef.current(), delay)
+  }
+
+  useEffect(() => {
+    exiting.current = false
+    scheduleAutoDismiss()
+    return () => {
+      window.clearTimeout(autoDismissTimer.current)
+      window.clearTimeout(exitTimer.current)
+    }
+  }, [notification.id])
+
+  function beginSwipe(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const node = noticeRef.current
+    pointer.current = { id: event.pointerId, startX: event.clientX, dx: 0, moved: false }
+    node?.setPointerCapture?.(event.pointerId)
+    node?.classList.add('is-dragging')
+    clearAutoDismiss()
+  }
+
+  function moveSwipe(event) {
+    const gesture = pointer.current
+    const node = noticeRef.current
+    if (!gesture || gesture.id !== event.pointerId || !node) return
+    const movement = event.clientX - gesture.startX
+    gesture.dx = Math.max(0, movement)
+    gesture.moved ||= Math.abs(movement) > 5
+    node.style.setProperty('--bookmark-drag-x', `${gesture.dx}px`)
+    node.style.setProperty('--bookmark-drag-opacity', String(Math.max(.32, 1 - gesture.dx / 260)))
+  }
+
+  function finishSwipe(event, cancelled = false) {
+    const gesture = pointer.current
+    const node = noticeRef.current
+    if (!gesture || gesture.id !== event.pointerId || !node) return
+    pointer.current = null
+    if (node.hasPointerCapture?.(event.pointerId)) node.releasePointerCapture(event.pointerId)
+    node.classList.remove('is-dragging')
+    const shouldDismiss = !cancelled && gesture.dx >= Math.min(84, node.offsetWidth * .22)
+    if (shouldDismiss) {
+      beginDismiss()
+      return
+    }
+    suppressClick.current = gesture.moved
+    window.setTimeout(() => { suppressClick.current = false }, 0)
+    node.style.setProperty('--bookmark-drag-x', '0px')
+    node.style.setProperty('--bookmark-drag-opacity', '1')
+    scheduleAutoDismiss(3000)
+  }
+
+  function handleClick() {
+    if (suppressClick.current) return
+    beginDismiss()
+  }
+
+  return createPortal(<div className={`film-bookmark-layer ${offsetForNavigation ? 'above-navigation' : ''}`}>
+    <span className="visually-hidden" role="status" aria-live="polite">{announcement}</span>
+    <article ref={noticeRef} className={`film-bookmark-notice ${notification.unlocked ? 'is-unlocked' : 'is-progress'}`} onPointerDown={beginSwipe} onPointerMove={moveSwipe} onPointerUp={finishSwipe} onPointerCancel={(event) => finishSwipe(event, true)} onMouseEnter={clearAutoDismiss} onMouseLeave={() => scheduleAutoDismiss(3000)}>
+      <button className="film-bookmark-dismiss" type="button" onClick={handleClick} onFocus={clearAutoDismiss} onBlur={() => scheduleAutoDismiss(3000)} onKeyDown={(event) => { if (['Escape', 'Enter', ' '].includes(event.key)) beginDismiss() }} aria-label={formatText(t.filmNoticeDismiss, { name: t[film.nameKey] })} />
+      <span className="film-bookmark-ribbon" aria-hidden="true"><Icon name={notification.unlocked ? 'sparkle' : 'film'} size={15} /></span>
+      <FilmPreviewCard className="film-bookmark-preview" filmId={film.id} lang={lang} t={t} />
+      <span className="film-bookmark-copy">
+        <span className="film-bookmark-status"><Icon name={notification.unlocked ? 'sparkle' : 'film'} size={15} />{statusLabel}</span>
+        <strong>{t[film.nameKey]}</strong>
+        <span className="film-bookmark-condition"><b>{t.filmConditionLabel}</b>{t[film.conditionKey]}</span>
+        <span className="film-bookmark-progress"><span>{formatText(t.filmProgress, { current: notification.current, target: notification.target })}</span><b>{notification.current}/{notification.target}</b></span>
+        <i className="film-bookmark-progress-track" aria-hidden="true"><em style={{ width: `${progressPercent}%` }} /></i>
+      </span>
+    </article>
+  </div>, document.body)
 }
 
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
@@ -1228,6 +1345,7 @@ export default function App() {
   const [dailyLocked, setDailyLocked] = useState(false)
   const [history, setHistory] = useState([])
   const [filmCollection, setFilmCollection] = useState(createDefaultFilmCollection)
+  const [filmNotifications, setFilmNotifications] = useState(createQaFilmNotifications)
   const [selectedDay, setSelectedDay] = useState(null)
   const [staged, setStaged] = useState(QA_SAMPLE)
   const [samplerOpen, setSamplerOpen] = useState(false)
@@ -1401,11 +1519,15 @@ export default function App() {
       await requestPersistentStorage()
       const nextHistory = [completedDay, ...history.filter((item) => item.date !== date)]
       const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection(filmCollection, nextHistory))
+      const nextFilmNotifications = getFilmProgressChanges(history, nextHistory)
+        .filter((notification) => !filmCollection.unlockedFilmIds.includes(notification.filmId))
+        .map((notification) => ({ ...notification, id: `${completedDay.completedAt}-${notification.filmId}` }))
       await saveFilmCollection(nextFilmCollection)
       setDay(completedDay)
       setDailyLocked(true)
       setHistory(nextHistory)
       setFilmCollection(nextFilmCollection)
+      if (nextFilmNotifications.length) setFilmNotifications((current) => [...current, ...nextFilmNotifications])
       setDevelopedDay(completedDay)
       setComposing(false)
       setBackground(null)
@@ -1542,5 +1664,6 @@ export default function App() {
     <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
     <DeletePolaroidDialog day={pendingDelete} lang={lang} t={t} deleting={deletingPolaroid} onCancel={() => { if (!deletingPolaroid) setPendingDelete(null) }} onConfirm={confirmDeletePolaroid} />
     <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
+    {filmNotifications[0] ? <FilmProgressBookmark key={filmNotifications[0].id} notification={filmNotifications[0]} lang={lang} t={t} offsetForNavigation={!immersiveEditor} onDismiss={() => setFilmNotifications((current) => current.slice(1))} /> : null}
   </div>
 }
