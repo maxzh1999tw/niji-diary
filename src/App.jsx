@@ -371,12 +371,12 @@ function PolaroidSourceStrip({ photos = {}, samples = {}, labels }) {
   ))}</div>
 }
 
-function FilmPhotoPlaceholder({ t }) {
-  return <div className="film-photo-placeholder" aria-hidden="true"><span>{t.filmPreviewPhoto}</span></div>
+function FilmPhotoPlaceholder() {
+  return <div className="film-photo-placeholder" aria-hidden="true" />
 }
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
-  return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder t={t} />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder>{t.filmPreviewCaption}</PolaroidCaption></PolaroidCard>
+  return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder>{t.filmPreviewCaption}</PolaroidCaption></PolaroidCard>
 }
 
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
