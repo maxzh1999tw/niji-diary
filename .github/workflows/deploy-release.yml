@@ -1,0 +1,67 @@
+name: Deploy release to Cloudflare Pages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy release to production and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build site
+        run: npm run build
+
+      - name: Deploy production
+        id: deploy-production
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4'
+          command: pages deploy docs --project-name=niji-diary
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy test preview
+        id: deploy-test
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4'
+          command: pages deploy docs --project-name=niji-diary --branch=test
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write deployment summary
+        run: |
+          {
+            echo '### Cloudflare Pages deployment'
+            echo '- Production: https://niji.mia-and-max.com'
+            echo '- Test: https://test.niji-diary.pages.dev'
+          } >> "$GITHUB_STEP_SUMMARY"

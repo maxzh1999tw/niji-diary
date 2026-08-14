@@ -17,4 +17,20 @@ npm run dev
 
 執行 `npm run build` 後，靜態網站會輸出至 `docs` 資料夾。Repository 的 Pages 來源設定為 `main` 分支的 `/docs`，推送更新後 GitHub Pages 會自動發布。
 
+## 部署到 Cloudflare Pages
+
+GitHub Actions 已設定兩種部署方式：
+
+- `.github/workflows/deploy-release.yml`：推送 `v*` 格式的 release tag 後，先執行測試與建置，再更新正式站與測試站。
+- `.github/workflows/deploy-test.yml`：在 GitHub Actions 手動執行，輸入要部署的 branch、tag 或 commit，只更新測試站。
+
+正式站為 [niji.mia-and-max.com](https://niji.mia-and-max.com)，測試站使用 Cloudflare Pages 的 `test` preview branch，網址為 `https://test.niji-diary.pages.dev`。
+
+請在 GitHub Repository 的 Settings → Secrets and variables → Actions → Secrets 新增：
+
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare 帳戶 ID。
+- `CLOUDFLARE_API_TOKEN`：只授予 Account → Cloudflare Pages → Edit 的 API Token。
+
+API Token 不要寫入程式碼或 commit；Cloudflare 官方的 Direct Upload CI 流程也使用這兩個 GitHub Secrets。
+
 創作中的照片會暫存在瀏覽器本機；拍立得完成後，系統只在 IndexedDB 保存底片已定稿的壓縮成品圖、可編輯文字、日期、完成時間與解鎖中繼資料，並刪除填色紀錄、來源照片與合成中間資料。資料不會上傳到伺服器，清除網站資料或更換瀏覽器／裝置後也不會自動同步。
