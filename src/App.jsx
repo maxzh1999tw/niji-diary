@@ -375,6 +375,11 @@ function FilmPhotoPlaceholder() {
   return <div className="film-photo-placeholder" aria-hidden="true" />
 }
 
+function getFilmPaperStyle(filmId) {
+  const paper = getFilm(filmId).paper
+  return { '--film-paper-top': paper.top, '--film-paper-middle': paper.middle, '--film-paper-bottom': paper.bottom, '--film-paper-accent': paper.accent }
+}
+
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
   return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder /></PolaroidCard>
 }
@@ -403,7 +408,7 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
 
 function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', decorative = false, children }) {
   const film = getFilm(filmId)
-  return <div className={`polaroid-card ${film.className} ${className}`} aria-hidden={decorative || undefined}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
+  return <div className={`polaroid-card ${film.className} ${className}`} style={getFilmPaperStyle(filmId)} aria-hidden={decorative || undefined}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
 }
 
 function PolaroidCaption({ children, placeholder = false }) {
@@ -661,7 +666,7 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
   }
 
   function beginGesture(event) {
-    const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
+    const frame = event.currentTarget.closest('.composition-canvas-photo')?.getBoundingClientRect()
     if (!frame) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -705,7 +710,7 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
     pointers.current.delete(event.pointerId)
     if (hasCapture) event.currentTarget.releasePointerCapture(event.pointerId)
     flushTransform()
-    const frame = event.currentTarget.closest('.composition-canvas')?.getBoundingClientRect()
+    const frame = event.currentTarget.closest('.composition-canvas-photo')?.getBoundingClientRect()
     if (frame) rebaseGesture(frame)
   }
 
@@ -730,11 +735,12 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
     { key: 'film', icon: 'film', label: t.filmPickerLabel },
   ]
   const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
+  const selectedFilm = getFilm(selectedFilmId)
 
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div>
+      <div className="canvas-stage"><div className={`composition-canvas ${selectedFilm.className}`} style={getFilmPaperStyle(selectedFilmId)}><div className="composition-canvas-photo"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div><div className="composition-canvas-footer" aria-hidden="true" /></div></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}</div>
