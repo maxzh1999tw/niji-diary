@@ -451,13 +451,12 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
     <span className="visually-hidden" role="status" aria-live="polite">{announcement}</span>
     <article ref={noticeRef} className={`film-bookmark-notice ${notification.unlocked ? 'is-unlocked' : 'is-progress'}`} onPointerDown={beginSwipe} onPointerMove={moveSwipe} onPointerUp={finishSwipe} onPointerCancel={(event) => finishSwipe(event, true)} onMouseEnter={clearAutoDismiss} onMouseLeave={() => scheduleAutoDismiss(3000)}>
       <button className="film-bookmark-dismiss" type="button" onClick={handleClick} onFocus={clearAutoDismiss} onBlur={() => scheduleAutoDismiss(3000)} onKeyDown={(event) => { if (['Escape', 'Enter', ' '].includes(event.key)) beginDismiss() }} aria-label={formatText(t.filmNoticeDismiss, { name: t[film.nameKey] })} />
-      <span className="film-bookmark-ribbon" aria-hidden="true"><Icon name={notification.unlocked ? 'sparkle' : 'film'} size={15} /></span>
       <FilmPreviewCard className="film-bookmark-preview" filmId={film.id} lang={lang} t={t} />
       <span className="film-bookmark-copy">
         <span className="film-bookmark-status"><Icon name={notification.unlocked ? 'sparkle' : 'film'} size={15} />{statusLabel}</span>
         <strong>{t[film.nameKey]}</strong>
         <span className="film-bookmark-condition"><b>{t.filmConditionLabel}</b>{t[film.conditionKey]}</span>
-        <span className="film-bookmark-progress"><span>{formatText(t.filmProgress, { current: notification.current, target: notification.target })}</span><b>{notification.current}/{notification.target}</b></span>
+        <span className="film-bookmark-progress">{formatText(t.filmProgress, { current: notification.current, target: notification.target })}</span>
         <i className="film-bookmark-progress-track" aria-hidden="true"><em style={{ width: `${progressPercent}%` }} /></i>
       </span>
     </article>
