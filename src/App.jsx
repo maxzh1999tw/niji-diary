@@ -379,7 +379,7 @@ function PolaroidCaption({ children, placeholder = false }) {
 }
 
 function EditablePolaroidCaption({ value, t, onChange, onCommit }) {
-  return <input className="polaroid-caption-input" aria-label={t.captionLabel} type="text" maxLength="60" value={value} onChange={(event) => onChange(event.target.value)} onBlur={onCommit} />
+  return <input className="polaroid-caption-input" aria-label={t.captionLabel} type="text" maxLength="60" value={value} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onCommit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
 }
 
 function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMove, onPointerUp, onWheel }) {
@@ -596,7 +596,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
   )
 }
 
-function ComposeScreen({ background, photos, samples, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
+function ComposeScreen({ background, photos, samples, caption, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onCaptionChange, onCaptionCommit, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
   const [activeTool, setActiveTool] = useState('transparency')
   const pointers = useRef(new Map())
   const gesture = useRef(null)
@@ -701,7 +701,7 @@ function ComposeScreen({ background, photos, samples, date, transform, setTransf
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><PolaroidCaption>{t.defaultCaption}</PolaroidCaption></PolaroidCard></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}</div>
@@ -1368,7 +1368,7 @@ export default function App() {
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const completedDay = { ...day, schemaVersion: 3, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const completedDay = { ...day, schemaVersion: 3, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
       await completeDraft(completedDay, date)
       await requestPersistentStorage()
       const nextHistory = [completedDay, ...history.filter((item) => item.date !== date)]
@@ -1434,6 +1434,18 @@ export default function App() {
     setDevelopedDay((current) => update(current))
   }
 
+  function updateDraftCaption(caption) {
+    setDay((current) => current ? { ...current, caption } : current)
+  }
+
+  async function persistDraftCaption(caption) {
+    if (!day || dailyLocked) return
+    const nextDay = { ...day, caption }
+    setDay(nextDay)
+    try { await saveDraft(nextDay) }
+    catch { showMessage(t.error) }
+  }
+
   async function persistCaption(target) {
     if (!target) return
     try { await saveDay(target); showMessage(t.captionSaved) }
@@ -1483,7 +1495,7 @@ export default function App() {
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
-          ? <ComposeScreen background={background} photos={day?.photos ?? {}} samples={day?.samples ?? {}} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onSelectFilm={selectFilm} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
+          ? <ComposeScreen background={background} photos={day?.photos ?? {}} samples={day?.samples ?? {}} caption={day?.caption ?? t.defaultCaption} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onCaptionChange={updateDraftCaption} onCaptionCommit={persistDraftCaption} onSelectFilm={selectFilm} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged
