@@ -17,6 +17,7 @@ const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
 const DEV_QUERY = import.meta.env.DEV ? new URLSearchParams(location.search) : null
 const QA_MODE = DEV_QUERY?.get('qa') ?? null
 const QA_FILM_ID = DEV_QUERY?.get('film') ?? null
+const FILM_DATABASE_ORDER = new Map(FILMS.map((film, index) => [film.id, index]))
 const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
 
 function Icon({ name, size = 24 }) {
@@ -1313,7 +1314,10 @@ function DeletePolaroidDialog({ day, lang, t, deleting, onCancel, onConfirm }) {
 function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
   const [filter, setFilter] = useState('all')
   const unlocked = new Set(filmCollection.unlockedFilmIds)
-  const visibleFilms = FILMS.filter((film) => filter === 'all' || (filter === 'unlocked' ? unlocked.has(film.id) : !unlocked.has(film.id)))
+  const visibleFilms = [...FILMS.filter((film) => filter === 'all' || (filter === 'unlocked' ? unlocked.has(film.id) : !unlocked.has(film.id)))].sort((left, right) => {
+    const ownershipOrder = Number(unlocked.has(right.id)) - Number(unlocked.has(left.id))
+    return ownershipOrder || FILM_DATABASE_ORDER.get(left.id) - FILM_DATABASE_ORDER.get(right.id)
+  })
   const unlockedCount = FILMS.filter((film) => unlocked.has(film.id)).length
   const selectedFilm = getFilm(filmCollection.selectedFilmId)
 
