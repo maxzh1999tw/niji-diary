@@ -48,17 +48,21 @@ const completedRecord = createCompletedDayRecord({
   photos: { red: 'large-source-photo' },
   samples: { red: '#ff0000' },
   composition: { x: 50 },
+  filmId: 'pink-pop',
   caption: '完成品',
   futureMetadata: { preserved: true },
 }, 'complete-polaroid')
 assert.equal(completedRecord.schemaVersion, COMPLETED_DAY_SCHEMA_VERSION)
 assert.equal(completedRecord.polaroidImage, 'complete-polaroid')
 assert.equal(completedRecord.caption, '完成品')
+assert.equal(completedRecord.date, '2026-08-12')
+assert.equal(completedRecord.completedAt, '2026-08-12T12:00:00.000Z')
 assert.deepEqual(completedRecord.futureMetadata, { preserved: true })
 assert.equal('photos' in completedRecord, false)
 assert.equal('samples' in completedRecord, false)
 assert.equal('cardImage' in completedRecord, false)
 assert.equal('composition' in completedRecord, false)
+assert.equal('filmId' in completedRecord, false)
 assert.equal(completedDayNeedsCompaction(completedRecord), false)
 assert.equal(completedDayNeedsCompaction(completed), true)
 assert.throws(() => createCompletedDayRecord(completed), /Missing completed Polaroid image/)
@@ -68,6 +72,17 @@ const migratedRecord = await migrateCompletedDay(completed, async () => 'migrate
 assert.equal(migratedRecord.polaroidImage, 'migrated-polaroid')
 assert.deepEqual(persistedMigration, migratedRecord)
 assert.equal('photos' in migratedRecord, false)
+
+let versionFourRenderCalled = false
+const versionFourRecord = { ...completedRecord, schemaVersion: 4, polaroidImage: 'caption-baked-polaroid' }
+const migratedVersionFour = await migrateCompletedDay(versionFourRecord, async () => {
+  versionFourRenderCalled = true
+  return 'captionless-polaroid'
+}, async () => {})
+assert.equal(versionFourRenderCalled, true)
+assert.equal(migratedVersionFour.schemaVersion, COMPLETED_DAY_SCHEMA_VERSION)
+assert.equal(migratedVersionFour.polaroidImage, 'captionless-polaroid')
+assert.equal(migratedVersionFour.caption, '完成品')
 
 const partialLegacyRecord = { date: '2026-08-13', completedAt: '2026-08-13T12:00:00.000Z', photos: { red: 'only-photo' } }
 const failedRenderRecord = await migrateCompletedDay(partialLegacyRecord, async () => { throw new Error('decode failed') }, async () => assert.fail('failed render must not overwrite storage'))

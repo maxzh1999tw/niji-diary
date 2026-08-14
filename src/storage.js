@@ -4,7 +4,7 @@ const DB_NAME = 'niji-diary'
 const STORE_NAME = 'days'
 const DB_VERSION = 1
 
-export const COMPLETED_DAY_SCHEMA_VERSION = 4
+export const COMPLETED_DAY_SCHEMA_VERSION = 5
 
 export const ACTIVE_DRAFT_KEY = '__active-draft__'
 export const FILM_COLLECTION_KEY = '__film-collection__'
@@ -109,6 +109,7 @@ export function createCompletedDayRecord(day, polaroidImage = day?.polaroidImage
   delete completedDay.samples
   delete completedDay.cardImage
   delete completedDay.composition
+  delete completedDay.filmId
   return completedDay
 }
 
@@ -121,6 +122,7 @@ export function completedDayNeedsCompaction(day) {
     || 'samples' in day
     || 'cardImage' in day
     || 'composition' in day
+    || 'filmId' in day
   )
 }
 
@@ -128,7 +130,9 @@ export async function migrateCompletedDay(day, renderPolaroid, persist = saveDay
   if (!completedDayNeedsCompaction(day)) return day
 
   try {
-    const polaroidImage = day.polaroidImage || await renderPolaroid(day)
+    const polaroidImage = day.schemaVersion === COMPLETED_DAY_SCHEMA_VERSION && day.polaroidImage
+      ? day.polaroidImage
+      : await renderPolaroid(day)
     const compactedDay = createCompletedDayRecord(day, polaroidImage)
     await persist(compactedDay)
     return compactedDay
