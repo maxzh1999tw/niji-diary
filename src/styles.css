@@ -250,6 +250,7 @@ img { max-width: 100%; }
 
 .film-grid { align-items: stretch; }
 .film-card.unlocked { min-height: 0; }
+.film-card.locked { box-shadow: none; }
 .film-status { gap: 3px; padding: 5px 9px 5px 5px; }
 
 @media (max-width: 760px) {
