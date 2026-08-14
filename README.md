@@ -17,6 +17,12 @@ npm run dev
 
 執行 `npm run build` 後，靜態網站會輸出至 `docs` 資料夾。Repository 的 Pages 來源設定為 `main` 分支的 `/docs`，推送更新後 GitHub Pages 會自動發布。
 
+## 安裝 PWA 與離線使用
+
+新正式站現在支援 PWA。第一次請在有網路時開啟 [niji.mia-and-max.com](https://niji.mia-and-max.com)，讓瀏覽器完成資源快取；在 Chrome 的網址列選單中選擇「安裝拾色日記」後，就能像 App 一樣從主畫面開啟。之後即使暫時沒有網路，拍照、取色、完成彩虹與查看已保存的資料仍可使用；只有跨站搬移資料等需要連線的功能會暫停。
+
+Service Worker 只會在 Cloudflare 新站（正式站與 Pages 測試站）自動註冊，並以網路優先更新 App shell、離線時使用快取版本。若瀏覽器仍顯示舊版本，重新整理一次即可完成更新。
+
 ## 部署到 Cloudflare Pages
 
 GitHub Actions 已設定兩種部署方式：
