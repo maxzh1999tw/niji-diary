@@ -30,8 +30,6 @@ function Icon({ name, size = 24 }) {
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
   if (name === 'back') return <svg {...common}><path d="m15 18-6-6 6-6" /></svg>
-  if (name === 'chevron-down') return <svg {...common}><path d="m6 9 6 6 6-6" /></svg>
-  if (name === 'chevron-up') return <svg {...common}><path d="m6 15 6-6 6 6" /></svg>
   if (name === 'reset') return <svg {...common}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
   if (name === 'check') return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>
   if (name === 'lock') return <svg {...common}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -382,27 +380,24 @@ function FilmPreviewCard({ filmId, lang, t, className = '' }) {
 }
 
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
-  const [open, setOpen] = useState(false)
   const selectedFilm = getFilm(selectedFilmId)
+  const availableFilms = FILMS.filter((film) => unlockedFilmIds.includes(film.id))
   return <section className="film-picker" aria-labelledby="film-picker-title">
     <span className="visually-hidden" id="film-picker-hint">{t.filmPickerHint}</span>
-    <button className={`film-picker-toggle ${open ? 'is-open' : ''}`} type="button" aria-expanded={open} aria-controls="film-picker-options" aria-describedby="film-picker-hint" onClick={() => setOpen((current) => !current)}>
-      <span className="film-picker-toggle-leading"><span className="film-picker-toggle-icon"><Icon name="film" size={18} /></span><span className="film-picker-toggle-copy"><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></span></span>
-      <span className="film-picker-toggle-current">{t[selectedFilm.nameKey]}</span>
-      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} />
-    </button>
-    {open ? <div className="film-picker-options" id="film-picker-options" role="group" aria-label={t.filmPickerLabel}>
-      {FILMS.map((film) => {
-        const unlocked = unlockedFilmIds.includes(film.id)
+    <div className="film-picker-heading">
+      <div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></div>
+      <span className="film-picker-current">{t[selectedFilm.nameKey]}</span>
+    </div>
+    <div className="film-picker-options" id="film-picker-options" role="group" aria-label={t.filmPickerLabel} aria-describedby="film-picker-hint">
+      {availableFilms.map((film) => {
         const selected = selectedFilm.id === film.id
-        return <button type="button" key={film.id} className={`film-option ${film.className} ${selected ? 'selected' : ''} ${unlocked ? '' : 'locked'}`} disabled={!unlocked} aria-pressed={selected} onClick={() => onSelect(film.id)}>
+        return <button type="button" key={film.id} className={`film-option ${film.className} ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={() => onSelect(film.id)}>
           <FilmPreviewCard filmId={film.id} lang={lang} t={t} />
           <strong className="film-option-name">{t[film.nameKey]}</strong>
           {selected ? <span className="film-option-check"><Icon name="check" size={14} /></span> : null}
-          {!unlocked ? <span className="film-option-lock"><Icon name="lock" size={13} /></span> : null}
         </button>
       })}
-    </div> : null}
+    </div>
   </section>
 }
 
@@ -732,17 +727,17 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
     { key: 'transparency', icon: 'opacity', label: t.toolTransparency, title: t.transparency, min: 0, max: 1, step: 0.01, value: transform.transparency ?? 0, output: `${Math.round((transform.transparency ?? 0) * 100)}%` },
     { key: 'radius', icon: 'radius', label: t.toolRadius, title: t.rainbowRadius, min: 0.55, max: 15, step: 0.05, value: transform.radius ?? 1, output: `${Math.round((transform.radius ?? 1) * 100)}%` },
     { key: 'angle', icon: 'angle', label: t.toolAngle, title: t.rainbowAngle, min: 10, max: 180, step: 1, value: transform.angle ?? 180, output: `${Math.round(transform.angle ?? 180)}°` },
+    { key: 'film', icon: 'film', label: t.filmPickerLabel },
   ]
-  const activeControl = editorTools.find((tool) => tool.key === activeTool) ?? editorTools[0]
+  const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
 
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
-    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button> : <i aria-hidden="true" />}</header>
+    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
       <div className="canvas-stage"><div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div>
       <div className="editor-dock">
-        {background ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : null}
-        <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>
-        <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={activeTool === tool.key ? 'active' : ''} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}<button className="toolbar-reset" type="button" onClick={resetRainbow}><Icon name="reset" size={21} /><span>{t.resetShort}</span></button></div>
+        {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
+        <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}</div>
       </div>
     </div>}
   </section>
