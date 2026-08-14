@@ -11,6 +11,7 @@ const TAB_KEYS = ['today', 'archive', 'films', 'settings']
 const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
 const FILM_PREVIEW_DATE = '2000-01-01'
 const FILM_PREVIEW_PHOTOS = {}
+const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
 const QA_MODE = import.meta.env.DEV ? new URLSearchParams(location.search).get('qa') : null
 const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
 
@@ -53,6 +54,25 @@ function withoutFilmCollectionMeta(collection) {
 
 function createDefaultFilmCollection() {
   return withoutFilmCollectionMeta(normalizeFilmCollection(null))
+}
+
+function readPendingFilmSelection() {
+  try {
+    const filmId = localStorage.getItem(PENDING_FILM_SELECTION_KEY)
+    return FILMS.some((film) => film.id === filmId) ? filmId : null
+  } catch {
+    return null
+  }
+}
+
+function rememberPendingFilmSelection(filmId) {
+  try { localStorage.setItem(PENDING_FILM_SELECTION_KEY, filmId) } catch { /* best effort fallback for interrupted IndexedDB writes */ }
+}
+
+function clearPendingFilmSelection(filmId) {
+  try {
+    if (localStorage.getItem(PENDING_FILM_SELECTION_KEY) === filmId) localStorage.removeItem(PENDING_FILM_SELECTION_KEY)
+  } catch { /* ignore storage cleanup failures */ }
 }
 
 function formatDate(date, lang, compact = false) {
@@ -740,7 +760,7 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><div className={`composition-canvas ${selectedFilm.className}`} style={getFilmPaperStyle(selectedFilmId)}><div className="composition-canvas-photo"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div><div className="composition-canvas-footer" aria-hidden="true" /></div></div>
+      <div className="canvas-stage"><div className={`composition-canvas ${selectedFilm.className}`} style={getFilmPaperStyle(selectedFilmId)}><div className="composition-canvas-photo"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}</div>
@@ -1247,6 +1267,7 @@ export default function App() {
   const [background, setBackground] = useState(QA_MODE === 'compose' ? './rainbow.svg' : null)
   const [rainbowTransform, setRainbowTransform] = useState({ x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1, angle: 180 })
   const [loading, setLoading] = useState(true)
+  const [filmCollectionReady, setFilmCollectionReady] = useState(Boolean(QA_MODE))
   const [processing, setProcessing] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -1304,14 +1325,28 @@ export default function App() {
     }
     let active = true
     setLoading(true)
+    setFilmCollectionReady(false)
     loadCollectionState(date).then(({ completedToday, completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection }) => {
       if (!active) return
       const savedDay = completedToday ?? draft
+      const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, completedDays))
+      const pendingFilmId = readPendingFilmSelection()
+      const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
+        ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, completedDays))
+        : hydratedFilmCollection
       setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft())
       setDailyLocked(savedDailyLock)
       setHistory(completedDays)
-      setFilmCollection(withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, completedDays)))
-    }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) setLoading(false) })
+      setFilmCollection(recoveredFilmCollection)
+      setFilmCollectionReady(true)
+      if (pendingFilmId) {
+        if (recoveredFilmCollection.selectedFilmId === pendingFilmId) {
+          saveFilmCollection(recoveredFilmCollection).then(() => clearPendingFilmSelection(pendingFilmId)).catch(() => {})
+        } else {
+          clearPendingFilmSelection(pendingFilmId)
+        }
+      }
+    }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) { setLoading(false); setFilmCollectionReady(true) } })
     return () => { active = false; clearTimeout(messageTimer.current) }
   }, [date])
 
@@ -1325,10 +1360,11 @@ export default function App() {
   }
 
   function selectFilm(filmId) {
-    if (!filmCollection.unlockedFilmIds.includes(filmId) || filmCollection.selectedFilmId === filmId) return
+    if (!filmCollectionReady || !filmCollection.unlockedFilmIds.includes(filmId) || filmCollection.selectedFilmId === filmId) return
     const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection({ ...filmCollection, selectedFilmId: filmId }, history))
+    rememberPendingFilmSelection(filmId)
     setFilmCollection(nextFilmCollection)
-    saveFilmCollection(nextFilmCollection).catch(() => showMessage(t.error))
+    saveFilmCollection(nextFilmCollection).then(() => clearPendingFilmSelection(filmId)).catch(() => showMessage(t.error))
   }
 
   async function handleCapture(file, input) {
@@ -1486,7 +1522,7 @@ export default function App() {
   }
 
   function startCompose() {
-    if (count === 7 && !dailyLocked) {
+    if (filmCollectionReady && count === 7 && !dailyLocked) {
       setComposing(true)
       resetAppViewport()
     }

@@ -272,17 +272,15 @@ img { max-width: 100%; }
 }
 
 .film-picker, .film-picker-options { background: transparent; }
-.composition-canvas { display: grid; grid-template-rows: minmax(0, 1fr) 25px; border-width: 8px; border-bottom-width: 0; border-color: transparent; background: linear-gradient(105deg, var(--film-paper-top, white) 0%, var(--film-paper-middle, #fdfcf9) 55%, var(--film-paper-bottom, #f5f3ee) 100%); }
-.composition-canvas-photo { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #ccc; }.composition-canvas-photo > img { width: 100%; height: 100%; display: block; object-fit: cover; user-select: none; pointer-events: none; }
-.composition-canvas-footer { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: linear-gradient(105deg, var(--film-paper-top, white) 0%, var(--film-paper-middle, #fdfcf9) 55%, var(--film-paper-bottom, #f5f3ee) 100%); }
-.composition-canvas.film-sky-blue .composition-canvas-footer, .composition-canvas.film-pink-pop .composition-canvas-footer, .composition-canvas.film-mint-green .composition-canvas-footer { isolation: isolate; }
-.composition-canvas.film-sky-blue .composition-canvas-footer::before, .composition-canvas.film-pink-pop .composition-canvas-footer::before, .composition-canvas.film-mint-green .composition-canvas-footer::before { content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none; opacity: .6; }
-.composition-canvas.film-sky-blue .composition-canvas-footer::before { background: radial-gradient(ellipse 22% 76% at 12% 70%, rgba(86,201,223,.8) 0 55%, transparent 57%), radial-gradient(ellipse 34% 100% at 91% 38%, rgba(86,201,223,.7) 0 52%, transparent 54%); }
-.composition-canvas.film-pink-pop .composition-canvas-footer::before { background: repeating-linear-gradient(118deg, transparent 0 16%, rgba(241,122,174,.75) 17% 20%, transparent 21% 31%), radial-gradient(circle at 19% 70%, rgba(241,122,174,.9) 0 4%, transparent 5%), radial-gradient(circle at 88% 28%, rgba(241,122,174,.9) 0 5%, transparent 6%); }
-.composition-canvas.film-mint-green .composition-canvas-footer::before { background: radial-gradient(ellipse 7% 76% at 12% 75%, rgba(115,189,125,.75) 0 48%, transparent 50%), radial-gradient(ellipse 7% 76% at 88% 26%, rgba(115,189,125,.75) 0 48%, transparent 50%), linear-gradient(76deg, transparent 0 13%, rgba(115,189,125,.4) 14% 15%, transparent 16% 84%, rgba(115,189,125,.4) 85% 86%, transparent 87%); }
+.composition-canvas { display: grid; grid-template-rows: minmax(0, 1fr); padding: 8px 8px 25px; border: 0; background: linear-gradient(105deg, var(--film-paper-top, white) 0%, var(--film-paper-middle, #fdfcf9) 55%, var(--film-paper-bottom, #f5f3ee) 100%); }
+.composition-canvas-photo { position: relative; z-index: 1; min-width: 0; min-height: 0; overflow: hidden; background: #ccc; }.composition-canvas-photo > img { width: 100%; height: 100%; display: block; object-fit: cover; user-select: none; pointer-events: none; }
+.composition-canvas.film-sky-blue::before, .composition-canvas.film-pink-pop::before, .composition-canvas.film-mint-green::before { content: ''; position: absolute; z-index: 0; inset: 0; pointer-events: none; opacity: .6; }
+.composition-canvas.film-sky-blue::before { background: radial-gradient(ellipse 22% 76% at 12% 70%, rgba(86,201,223,.8) 0 55%, transparent 57%), radial-gradient(ellipse 34% 100% at 91% 38%, rgba(86,201,223,.7) 0 52%, transparent 54%); }
+.composition-canvas.film-pink-pop::before { background: repeating-linear-gradient(118deg, transparent 0 16%, rgba(241,122,174,.75) 17% 20%, transparent 21% 31%), radial-gradient(circle at 19% 70%, rgba(241,122,174,.9) 0 4%, transparent 5%), radial-gradient(circle at 88% 28%, rgba(241,122,174,.9) 0 5%, transparent 6%); }
+.composition-canvas.film-mint-green::before { background: radial-gradient(ellipse 7% 76% at 12% 75%, rgba(115,189,125,.75) 0 48%, transparent 50%), radial-gradient(ellipse 7% 76% at 88% 26%, rgba(115,189,125,.75) 0 48%, transparent 50%), linear-gradient(76deg, transparent 0 13%, rgba(115,189,125,.4) 14% 15%, transparent 16% 84%, rgba(115,189,125,.4) 85% 86%, transparent 87%); }
 
 @media (max-width: 760px) {
-  .composition-canvas { grid-template-rows: minmax(0, 1fr) 23px; border-width: 7px; border-bottom-width: 0; }
+  .composition-canvas { padding: 7px 7px 23px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
