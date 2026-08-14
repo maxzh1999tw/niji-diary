@@ -5,11 +5,12 @@ import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChange
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
-import { completeDraft, deleteDay, loadCollectionState, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
+import { completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
 const TAB_KEYS = ['today', 'archive', 'films', 'settings']
 const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
+const COMPLETED_COLOR_SLOTS = Object.freeze(Object.fromEntries(COLOR_KEYS.map((key) => [key, true])))
 const FILM_PREVIEW_DATE = '2000-01-01'
 const FILM_PREVIEW_PHOTOS = {}
 const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
@@ -234,7 +235,23 @@ async function renderPolaroidImage(day, lang, fallbackCaption) {
   context.textAlign = 'right'
   context.fillText(dateText, width - footer.x, footer.textY)
   context.textAlign = 'left'
-  return canvas.toDataURL('image/png')
+  return canvas.toDataURL('image/jpeg', 0.9)
+}
+
+async function compactCompletedHistory(completedDays, lang, fallbackCaption) {
+  const compactedDays = []
+  for (const completedDay of completedDays) {
+    compactedDays.push(await migrateCompletedDay(
+      completedDay,
+      (record) => renderPolaroidImage(record, lang, fallbackCaption),
+    ))
+  }
+  return compactedDays
+}
+
+function getCompletedPolaroidImage(day, lang, fallbackCaption) {
+  if (day?.polaroidImage) return Promise.resolve(day.polaroidImage)
+  return renderPolaroidImage(day, lang, fallbackCaption)
 }
 
 function sampleSourcePhoto(image, point) {
@@ -500,6 +517,14 @@ function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, dat
   return <div className={`polaroid-card ${film.className} ${className}`} style={{ ...getPolaroidLayoutStyle(), '--film-paper-fallback': film.paper.middle }} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
 }
 
+function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
+  if (item.polaroidImage) {
+    return <div className={`polaroid-card stored-polaroid ${className}`}><img src={item.polaroidImage} alt={alt} loading={imageLoading} /></div>
+  }
+  const caption = item.caption ?? t.defaultCaption
+  return <PolaroidCard className={className} image={item.cardImage} alt={alt} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang} filmId={item.filmId}>{editable ? <EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</PolaroidCard>
+}
+
 function PolaroidCaption({ children, placeholder = false }) {
   return <span className={`polaroid-caption-text ${placeholder ? 'polaroid-caption-placeholder' : ''}`} aria-hidden={placeholder || undefined}>{children}</span>
 }
@@ -676,6 +701,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
   const photos = day?.photos ?? {}
   const samples = day?.samples ?? {}
   const isComplete = dailyLocked
+  const visiblePhotos = isComplete ? COMPLETED_COLOR_SLOTS : photos
   return (
     <section className="today-screen screen-enter" aria-labelledby="today-title">
       <div className="mission-head">
@@ -694,7 +720,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
 
       <div className="collection-panel">
         <div className="panel-title"><h2>{t.colorSlots}</h2><span>{count === 7 ? t.allFound : formatText(t.foundCount, { count })}</span></div>
-        {loading ? <div className="slot-loading" /> : <EnergyStrip photos={photos} samples={samples} labels={t.colors} interactive={!isComplete} onSelect={onRemove} />}
+        {loading ? <div className="slot-loading" /> : <EnergyStrip photos={visiblePhotos} samples={samples} labels={t.colors} interactive={!isComplete} onSelect={onRemove} />}
         {!isComplete && count > 0 ? <p className="slot-hint">{t.tapToRemove}</p> : null}
       </div>
 
@@ -837,7 +863,7 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
 }
 
 function ArchivePolaroid({ item, lang, t }) {
-  return <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang} filmId={item.filmId}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+  return <CompletedPolaroid item={item} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} lang={lang} t={t} />
 }
 
 function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
@@ -1289,8 +1315,7 @@ function RainbowModal({ day, lang, t, exporting, onClose, onSave, onShare, onCap
   }, [day?.date])
 
   if (!day) return null
-  const caption = day.caption ?? t.defaultCaption
-  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
+  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><CompletedPolaroid item={day} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} lang={lang} t={t} editable={!day.polaroidImage} onCaptionChange={onCaptionChange} onCaptionCommit={onCaptionCommit} /><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
 }
 
 function PrinterShell({ foreground = false }) {
@@ -1330,18 +1355,17 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
     }
     preparePrint()
     return () => { active = false }
-  }, [day?.date, day?.cardImage])
+  }, [day?.date, day?.cardImage, day?.polaroidImage])
 
   function finishPrintAnimation(event) {
     if (event.animationName === 'eject-polaroid') setPrintPhase('complete')
   }
 
   if (!day) return null
-  const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className={`printer-stage print-${printPhase}`} aria-label={t.developedTitle} aria-busy={printPhase === 'loading'}><PrinterShell /><div ref={printedPolaroidRef} className="printed-polaroid-feed"><div className="printed-polaroid-motion" onAnimationEnd={finishPrintAnimation}><PolaroidCard className="printed-polaroid" image={day.cardImage} imageLoading="eager" alt={t.developedAlt} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div></div><PrinterShell foreground /></div>
-    <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
+    <div className={`printer-stage print-${printPhase}`} aria-label={t.developedTitle} aria-busy={printPhase === 'loading'}><PrinterShell /><div ref={printedPolaroidRef} className="printed-polaroid-feed"><div className="printed-polaroid-motion" onAnimationEnd={finishPrintAnimation}><CompletedPolaroid className="printed-polaroid" item={day} imageLoading="eager" alt={t.developedAlt} lang={lang} t={t} editable={!day.polaroidImage} onCaptionChange={onCaptionChange} onCaptionCommit={onCaptionCommit} /></div></div><PrinterShell foreground /></div>
+    {!day.polaroidImage ? <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p> : null}
     <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
     <button className="result-done" type="button" onClick={onDone}>{t.done}</button>
   </section></div>
@@ -1375,7 +1399,7 @@ export default function App() {
   const [date, setDate] = useState(localDateKey)
   const t = translations[lang]
   const photos = day?.photos ?? {}
-  const count = COLOR_KEYS.reduce((total, key) => total + (photos[key] ? 1 : 0), 0)
+  const count = dailyLocked ? COLOR_KEYS.length : COLOR_KEYS.reduce((total, key) => total + (photos[key] ? 1 : 0), 0)
 
   function showMessage(text) {
     clearTimeout(messageTimer.current)
@@ -1410,7 +1434,9 @@ export default function App() {
     if (QA_MODE) {
       const qaPhotos = Object.fromEntries(COLOR_KEYS.map((key) => [key, './rainbow.svg']))
       const qaCompleted = QA_MODE === 'result' || QA_MODE === 'album'
-      const qaDay = { schemaVersion: 2, date, photos: qaPhotos, samples: FALLBACK_COLORS, cardImage: qaCompleted ? './rainbow.svg' : undefined, completedAt: qaCompleted ? new Date().toISOString() : null }
+      const qaDay = qaCompleted
+        ? { schemaVersion: 4, date, polaroidImage: './rainbow.svg', completedAt: new Date().toISOString() }
+        : { schemaVersion: 3, date, photos: qaPhotos, samples: FALLBACK_COLORS, completedAt: null }
       const qaAlbum = QA_MODE === 'album' ? Array.from({ length: 12 }, (_, index) => ({ ...qaDay, date: `2026-07-${String(13 - index).padStart(2, '0')}` })) : []
       setDay(qaDay)
       setDailyLocked(qaCompleted)
@@ -1422,17 +1448,19 @@ export default function App() {
     let active = true
     setLoading(true)
     setFilmCollectionReady(false)
-    loadCollectionState(date).then(({ completedToday, completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection }) => {
+    loadCollectionState(date).then(async ({ completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection }) => {
+      const compactedDays = await compactCompletedHistory(completedDays, lang, translations[lang].defaultCaption)
       if (!active) return
+      const completedToday = compactedDays.find((item) => item.date === date) ?? null
       const savedDay = completedToday ?? draft
-      const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, completedDays))
+      const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, compactedDays))
       const pendingFilmId = readPendingFilmSelection()
       const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
-        ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, completedDays))
+        ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, compactedDays))
         : hydratedFilmCollection
       setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft())
       setDailyLocked(savedDailyLock)
-      setHistory(completedDays)
+      setHistory(compactedDays)
       setFilmCollection(recoveredFilmCollection)
       setFilmCollectionReady(true)
       if (pendingFilmId) {
@@ -1523,7 +1551,9 @@ export default function App() {
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const completedDay = { ...day, schemaVersion: 3, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const renderSource = { ...day, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const polaroidImage = await renderPolaroidImage(renderSource, lang, t.defaultCaption)
+      const completedDay = createCompletedDayRecord(renderSource, polaroidImage)
       await completeDraft(completedDay, date)
       await requestPersistentStorage()
       const nextHistory = [completedDay, ...history.filter((item) => item.date !== date)]
@@ -1550,15 +1580,15 @@ export default function App() {
   function downloadPolaroid(dataUrl, target) {
     const link = document.createElement('a')
     link.href = dataUrl
-    link.download = `niji-polaroid-${target.date}.png`
+    link.download = `niji-polaroid-${target.date}.jpg`
     link.click()
   }
 
   async function saveRainbowCard(target) {
-    if (!target?.cardImage) return
+    if (!target?.polaroidImage && !target?.cardImage) return
     setExporting(true)
     try {
-      const polaroidImage = await renderPolaroidImage(target, lang, t.defaultCaption)
+      const polaroidImage = await getCompletedPolaroidImage(target, lang, t.defaultCaption)
       downloadPolaroid(polaroidImage, target)
       showMessage(t.imageSaved)
     } catch { showMessage(t.error) }
@@ -1566,11 +1596,11 @@ export default function App() {
   }
 
   async function shareRainbowCard(target) {
-    if (!target?.cardImage) return
+    if (!target?.polaroidImage && !target?.cardImage) return
     setExporting(true)
     try {
-      const polaroidImage = await renderPolaroidImage(target, lang, t.defaultCaption)
-      const filename = `niji-polaroid-${target.date}.png`
+      const polaroidImage = await getCompletedPolaroidImage(target, lang, t.defaultCaption)
+      const filename = `niji-polaroid-${target.date}.jpg`
       const file = dataUrlToFile(polaroidImage, filename)
       if (file && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: t.shareTitle, text: target.caption ?? t.defaultCaption })

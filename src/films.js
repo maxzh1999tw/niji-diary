@@ -122,6 +122,7 @@ export function isGreenSpectrumColor(value) {
 }
 
 export function isAllGreenRainbow(day) {
+  if (typeof day?.achievements?.allGreenRainbow === 'boolean') return day.achievements.allGreenRainbow
   return COLOR_KEYS.every((key) => Boolean(day?.photos?.[key]) && isGreenSpectrumColor(day?.samples?.[key]))
 }
 

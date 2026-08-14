@@ -1,8 +1,10 @@
-import { FILM_COLLECTION_SCHEMA_VERSION, normalizeFilmCollection } from './films.js'
+import { FILM_COLLECTION_SCHEMA_VERSION, isAllGreenRainbow, normalizeFilmCollection } from './films.js'
 
 const DB_NAME = 'niji-diary'
 const STORE_NAME = 'days'
 const DB_VERSION = 1
+
+export const COMPLETED_DAY_SCHEMA_VERSION = 4
 
 export const ACTIVE_DRAFT_KEY = '__active-draft__'
 export const FILM_COLLECTION_KEY = '__film-collection__'
@@ -90,6 +92,51 @@ export function saveDay(day) {
   })
 }
 
+export function createCompletedDayRecord(day, polaroidImage = day?.polaroidImage) {
+  if (typeof polaroidImage !== 'string' || !polaroidImage) throw new Error('Missing completed Polaroid image')
+
+  const completedDay = {
+    ...day,
+    schemaVersion: COMPLETED_DAY_SCHEMA_VERSION,
+    polaroidImage,
+    achievements: {
+      ...(day?.achievements ?? {}),
+      allGreenRainbow: isAllGreenRainbow(day),
+    },
+  }
+
+  delete completedDay.photos
+  delete completedDay.samples
+  delete completedDay.cardImage
+  delete completedDay.composition
+  return completedDay
+}
+
+export function completedDayNeedsCompaction(day) {
+  return Boolean(day?.completedAt) && (
+    day.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION
+    || typeof day.polaroidImage !== 'string'
+    || !day.polaroidImage
+    || 'photos' in day
+    || 'samples' in day
+    || 'cardImage' in day
+    || 'composition' in day
+  )
+}
+
+export async function migrateCompletedDay(day, renderPolaroid, persist = saveDay) {
+  if (!completedDayNeedsCompaction(day)) return day
+
+  try {
+    const polaroidImage = day.polaroidImage || await renderPolaroid(day)
+    const compactedDay = createCompletedDayRecord(day, polaroidImage)
+    await persist(compactedDay)
+    return compactedDay
+  } catch {
+    return day
+  }
+}
+
 export function saveDraft(day) {
   const draft = {
     ...day,
@@ -122,7 +169,7 @@ export function saveFilmCollection(collection) {
 }
 
 export function completeDraft(day, completionDate) {
-  const completedDay = { ...day, schemaVersion: 3, date: completionDate }
+  const completedDay = createCompletedDayRecord({ ...day, date: completionDate })
   const completionGate = { date: COMPLETION_GATE_KEY, lastCompletedDate: completionDate }
 
   return transact('readwrite', (store) => {

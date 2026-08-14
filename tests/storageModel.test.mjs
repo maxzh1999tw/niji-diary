@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { ACTIVE_DRAFT_KEY, deriveCollectionState } from '../src/storage.js'
+import { ACTIVE_DRAFT_KEY, COMPLETED_DAY_SCHEMA_VERSION, completedDayNeedsCompaction, createCompletedDayRecord, deriveCollectionState, migrateCompletedDay } from '../src/storage.js'
 
 const legacyRecords = [
   { date: '2026-08-01', photos: { red: 'old-red' }, samples: { red: '#aa0000' }, completedAt: null },
@@ -41,4 +41,44 @@ const deletedPolaroidState = deriveCollectionState([
 assert.equal(deletedPolaroidState.completedToday, null)
 assert.equal(deletedPolaroidState.dailyLocked, true)
 
-console.log("Storage model: today's legacy draft migrates alone, older drafts reset, and daily completion remains locked.")
+const completedRecord = createCompletedDayRecord({
+  date: '2026-08-12',
+  completedAt: '2026-08-12T12:00:00.000Z',
+  cardImage: 'composite-image',
+  photos: { red: 'large-source-photo' },
+  samples: { red: '#ff0000' },
+  composition: { x: 50 },
+  caption: '完成品',
+  futureMetadata: { preserved: true },
+}, 'complete-polaroid')
+assert.equal(completedRecord.schemaVersion, COMPLETED_DAY_SCHEMA_VERSION)
+assert.equal(completedRecord.polaroidImage, 'complete-polaroid')
+assert.equal(completedRecord.caption, '完成品')
+assert.deepEqual(completedRecord.futureMetadata, { preserved: true })
+assert.equal('photos' in completedRecord, false)
+assert.equal('samples' in completedRecord, false)
+assert.equal('cardImage' in completedRecord, false)
+assert.equal('composition' in completedRecord, false)
+assert.equal(completedDayNeedsCompaction(completedRecord), false)
+assert.equal(completedDayNeedsCompaction(completed), true)
+assert.throws(() => createCompletedDayRecord(completed), /Missing completed Polaroid image/)
+
+let persistedMigration = null
+const migratedRecord = await migrateCompletedDay(completed, async () => 'migrated-polaroid', async (record) => { persistedMigration = record })
+assert.equal(migratedRecord.polaroidImage, 'migrated-polaroid')
+assert.deepEqual(persistedMigration, migratedRecord)
+assert.equal('photos' in migratedRecord, false)
+
+const partialLegacyRecord = { date: '2026-08-13', completedAt: '2026-08-13T12:00:00.000Z', photos: { red: 'only-photo' } }
+const failedRenderRecord = await migrateCompletedDay(partialLegacyRecord, async () => { throw new Error('decode failed') }, async () => assert.fail('failed render must not overwrite storage'))
+assert.equal(failedRenderRecord, partialLegacyRecord)
+
+const failedWriteRecord = await migrateCompletedDay(partialLegacyRecord, async () => 'rendered-polaroid', async () => { throw new Error('quota exceeded') })
+assert.equal(failedWriteRecord, partialLegacyRecord)
+
+let compactRenderCalled = false
+const unchangedCompactRecord = await migrateCompletedDay(completedRecord, async () => { compactRenderCalled = true })
+assert.equal(unchangedCompactRecord, completedRecord)
+assert.equal(compactRenderCalled, false)
+
+console.log("Storage model: drafts migrate safely, completed days keep only the final Polaroid image, and daily completion remains locked.")

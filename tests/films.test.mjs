@@ -29,6 +29,8 @@ assert.deepEqual(getFilmProgressChanges(threeDayStreak.slice(0, 2), threeDayStre
 ])
 
 assert.equal(isAllGreenRainbow(greenRainbow), true)
+assert.equal(isAllGreenRainbow({ achievements: { allGreenRainbow: true } }), true)
+assert.equal(isAllGreenRainbow({ achievements: { allGreenRainbow: false }, ...greenRainbow }), false)
 assert.equal(getFilmProgress(FILMS[3], [completed('2026-08-04', greenRainbow)]).met, true)
 assert.equal(getFilmProgress(FILMS[3], [completed('2026-08-04')]).met, false)
 assert.deepEqual(getFilmProgressChanges([], [completed('2026-08-04', greenRainbow)]).find((change) => change.filmId === 'mint-green'),
