@@ -40,7 +40,8 @@ assert.equal(classicSurface.includes('<circle'), false, 'classic white must rema
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).overlaySvg.includes('<path'), false, 'classic white overlay must remain empty')
 
 const skyModel = getFilmRenderModel('sky-blue')
-assert.equal((skyModel.svg.match(/<circle /g) ?? []).length, 4)
+assert.equal((skyModel.svg.match(/<circle /g) ?? []).length, 6)
+assert.equal(skyModel.svg.includes('<path'), false, 'sky-blue artwork must use circular bubbles only')
 assert.equal((skyModel.svg + skyModel.overlaySvg).includes('<ellipse'), false, 'sky-blue circles must stay circles at every render size')
 assert.equal(skyModel.overlaySvg.includes('frame-only'), false, 'sky-blue decoration stays clear of the photo without a foreground layer')
 assert.match(skyModel.svg, /fill="none" stroke="#56c9df"/)
