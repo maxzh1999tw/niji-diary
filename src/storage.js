@@ -1,8 +1,11 @@
+import { FILM_COLLECTION_SCHEMA_VERSION, normalizeFilmCollection } from './films.js'
+
 const DB_NAME = 'niji-diary'
 const STORE_NAME = 'days'
 const DB_VERSION = 1
 
 export const ACTIVE_DRAFT_KEY = '__active-draft__'
+export const FILM_COLLECTION_KEY = '__film-collection__'
 const COMPLETION_GATE_KEY = '__completion-gate__'
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -69,13 +72,15 @@ export function deriveCollectionState(records, today) {
 export async function loadCollectionState(today) {
   const records = await getAllRecords()
   const state = deriveCollectionState(records, today)
+  const filmCollection = normalizeFilmCollection(records.find((record) => record.date === FILM_COLLECTION_KEY), state.completedDays)
 
   if (state.legacyDraftKeys.length) {
     if (state.draftNeedsMigration) await saveDraft(state.draft)
     await deleteRecords(state.legacyDraftKeys)
   }
+  if (filmCollection.needsSave) await saveFilmCollection(filmCollection)
 
-  return state
+  return { ...state, filmCollection }
 }
 
 export function saveDay(day) {
@@ -87,6 +92,7 @@ export function saveDay(day) {
 
 export function saveDraft(day) {
   const draft = {
+    ...day,
     schemaVersion: 3,
     date: ACTIVE_DRAFT_KEY,
     photos: day?.photos ?? {},
@@ -97,6 +103,21 @@ export function saveDraft(day) {
   return transact('readwrite', (store) => {
     store.put(draft)
     return draft
+  })
+}
+
+export function saveFilmCollection(collection) {
+  const record = {
+    ...collection,
+    schemaVersion: FILM_COLLECTION_SCHEMA_VERSION,
+    date: FILM_COLLECTION_KEY,
+    unlockedFilmIds: Array.isArray(collection?.unlockedFilmIds) ? [...collection.unlockedFilmIds] : [],
+    selectedFilmId: collection?.selectedFilmId,
+  }
+  delete record.needsSave
+  return transact('readwrite', (store) => {
+    store.put(record)
+    return record
   })
 }
 

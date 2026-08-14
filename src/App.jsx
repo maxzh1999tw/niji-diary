@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
+import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, normalizeFilmCollection } from './films.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
-import { completeDraft, deleteDay, loadCollectionState, requestPersistentStorage, saveDay, saveDraft } from './storage.js'
+import { completeDraft, deleteDay, loadCollectionState, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
-const TAB_KEYS = ['today', 'archive', 'settings']
+const TAB_KEYS = ['today', 'archive', 'films', 'settings']
 const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
 const QA_MODE = import.meta.env.DEV ? new URLSearchParams(location.search).get('qa') : null
 const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
@@ -23,6 +24,7 @@ function Icon({ name, size = 24 }) {
   if (name === 'share') return <svg {...common}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.4" /><path d="m8.7 13.3 6.6 4.4" /></svg>
   if (name === 'edit') return <svg {...common}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
   if (name === 'book') return <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
+  if (name === 'film') return <svg {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4" /></svg>
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
   if (name === 'back') return <svg {...common}><path d="m15 18-6-6 6-6" /></svg>
@@ -40,6 +42,15 @@ function localDateKey() {
 
 function createEmptyDraft() {
   return { schemaVersion: 3, photos: {}, samples: {}, completedAt: null }
+}
+
+function withoutFilmCollectionMeta(collection) {
+  const { needsSave, ...persisted } = collection
+  return persisted
+}
+
+function createDefaultFilmCollection() {
+  return withoutFilmCollectionMeta(normalizeFilmCollection(null))
 }
 
 function formatDate(date, lang, compact = false) {
@@ -133,9 +144,56 @@ function fitCanvasText(context, text, maxWidth) {
   return `${fitted}…`
 }
 
+function drawFilmDecorations(context, film, width, height) {
+  context.save()
+  context.globalAlpha = 0.42
+  context.fillStyle = film.paper.accent
+  context.strokeStyle = film.paper.accent
+  context.lineWidth = 8
+
+  if (film.decoration === 'clouds') {
+    for (const [x, y, radius] of [[88, 1305, 26], [134, 1322, 38], [180, 1308, 23], [840, 1368, 30], [895, 1350, 45], [945, 1372, 24]]) {
+      context.beginPath()
+      context.arc(x, y, radius, 0, Math.PI * 2)
+      context.fill()
+    }
+  }
+
+  if (film.decoration === 'confetti') {
+    for (const [x, y, rotation] of [[78, 1290, -0.35], [145, 1370, 0.65], [240, 1325, -0.75], [800, 1322, 0.5], [884, 1382, -0.45], [950, 1285, 0.35]]) {
+      context.save()
+      context.translate(x, y)
+      context.rotate(rotation)
+      context.fillRect(-6, -22, 12, 44)
+      context.restore()
+    }
+    context.globalAlpha = 0.65
+    for (const [x, y] of [[105, 1390], [205, 1288], [830, 1288], [915, 1322]]) {
+      context.beginPath()
+      context.arc(x, y, 10, 0, Math.PI * 2)
+      context.fill()
+    }
+  }
+
+  if (film.decoration === 'leaves') {
+    for (const [x, y, rotation] of [[92, 1320, -0.65], [155, 1370, 0.35], [870, 1320, 0.55], [935, 1370, -0.4]]) {
+      context.save()
+      context.translate(x, y)
+      context.rotate(rotation)
+      context.beginPath()
+      context.ellipse(0, 0, 13, 29, 0, 0, Math.PI * 2)
+      context.fill()
+      context.restore()
+    }
+  }
+
+  context.restore()
+}
+
 async function renderPolaroidImage(day, lang, fallbackCaption) {
   if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
   await document.fonts?.ready
+  const film = getFilm(day.filmId)
   const width = 1000
   const height = 1500
   const canvas = document.createElement('canvas')
@@ -143,11 +201,12 @@ async function renderPolaroidImage(day, lang, fallbackCaption) {
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
   const paper = context.createLinearGradient(0, 0, width, height)
-  paper.addColorStop(0, '#ffffff')
-  paper.addColorStop(0.58, '#fdfcf9')
-  paper.addColorStop(1, '#f5f3ee')
+  paper.addColorStop(0, film.paper.top)
+  paper.addColorStop(0.58, film.paper.middle)
+  paper.addColorStop(1, film.paper.bottom)
   context.fillStyle = paper
   context.fillRect(0, 0, width, height)
+  drawFilmDecorations(context, film, width, height)
 
   const mainImage = await loadImageSource(day.cardImage)
   const photoX = 35
@@ -310,8 +369,33 @@ function PolaroidSourceStrip({ photos = {}, samples = {}, labels }) {
   ))}</div>
 }
 
-function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, lang, className = '', children }) {
-  return <div className={`polaroid-card ${className}`}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{formatDate(date, lang, true)}</time></div></div>
+function FilmVisual({ filmId, compact = false }) {
+  const film = getFilm(filmId)
+  return <span className={`film-visual ${film.className} ${compact ? 'is-compact' : ''}`} aria-hidden="true"><i className="film-visual-photo" /><i className="film-visual-sources" /><i className="film-visual-caption" /></span>
+}
+
+function FilmPicker({ selectedFilmId, unlockedFilmIds, t, onSelect }) {
+  const selectedFilm = getFilm(selectedFilmId)
+  return <section className="film-picker" aria-labelledby="film-picker-title">
+    <div className="film-picker-heading"><div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel} · {t[selectedFilm.nameKey]}</strong></div><small>{t.filmPickerHint}</small></div>
+    <div className="film-picker-options" role="group" aria-label={t.filmPickerLabel}>
+      {FILMS.map((film) => {
+        const unlocked = unlockedFilmIds.includes(film.id)
+        const selected = selectedFilm.id === film.id
+        return <button type="button" key={film.id} className={`film-option ${film.className} ${selected ? 'selected' : ''} ${unlocked ? '' : 'locked'}`} disabled={!unlocked} aria-pressed={selected} onClick={() => onSelect(film.id)}>
+          <FilmVisual filmId={film.id} compact />
+          <span className="film-option-copy"><strong>{t[film.nameKey]}</strong><small>{unlocked ? (selected ? t.filmSelected : t.useFilm) : t.filmLockedShort}</small></span>
+          {selected ? <span className="film-option-check"><Icon name="check" size={14} /></span> : null}
+          {!unlocked ? <span className="film-option-lock"><Icon name="lock" size={13} /></span> : null}
+        </button>
+      })}
+    </div>
+  </section>
+}
+
+function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, lang, filmId, className = '', children }) {
+  const film = getFilm(filmId)
+  return <div className={`polaroid-card ${film.className} ${className}`}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{formatDate(date, lang, true)}</time></div></div>
 }
 
 function PolaroidCaption({ children }) {
@@ -536,7 +620,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
   )
 }
 
-function ComposeScreen({ background, samples, transform, setTransform, t, onCapture, onBack, onFinish, finishing }) {
+function ComposeScreen({ background, samples, transform, setTransform, selectedFilmId, unlockedFilmIds, t, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
   const [activeTool, setActiveTool] = useState('transparency')
   const pointers = useRef(new Map())
   const gesture = useRef(null)
@@ -643,6 +727,7 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
       <div className="canvas-stage"><div className="composition-canvas"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div>
       <div className="editor-dock">
+        {background ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} t={t} onSelect={onSelectFilm} /> : null}
         <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={activeTool === tool.key ? 'active' : ''} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}<button className="toolbar-reset" type="button" onClick={resetRainbow}><Icon name="reset" size={21} /><span>{t.resetShort}</span></button></div>
       </div>
@@ -651,7 +736,7 @@ function ComposeScreen({ background, samples, transform, setTransform, t, onCapt
 }
 
 function ArchivePolaroid({ item, lang, t }) {
-  return <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
+  return <PolaroidCard image={item.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(item.date, lang) })} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang} filmId={item.filmId}><PolaroidCaption>{item.caption ?? t.defaultCaption}</PolaroidCaption></PolaroidCard>
 }
 
 function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
@@ -1041,6 +1126,36 @@ function DeletePolaroidDialog({ day, lang, t, deleting, onCancel, onConfirm }) {
   return <div className="delete-confirm-scrim"><button className="delete-confirm-dismiss" type="button" onClick={onCancel} aria-label={t.cancelDelete} disabled={deleting} /><section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" onKeyDown={handleDialogKeyDown}><span className="delete-dialog-icon"><Icon name="trash" size={34} /></span><div><span className="chrome-kicker">DELETE POLAROID?</span><h2 id="delete-dialog-title">{t.deleteTitle}</h2><p id="delete-dialog-description">{formatText(t.deleteMessage, { date: displayDate })}</p></div><div className="delete-dialog-actions"><button ref={cancelRef} type="button" onClick={onCancel} disabled={deleting}>{t.cancelDelete}</button><button className="confirm-delete" type="button" onClick={onConfirm} disabled={deleting}><Icon name="trash" size={19} />{deleting ? t.deletingPolaroid : t.confirmDelete}</button></div></section></div>
 }
 
+function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
+  const [filter, setFilter] = useState('all')
+  const unlocked = new Set(filmCollection.unlockedFilmIds)
+  const visibleFilms = FILMS.filter((film) => filter === 'all' || (filter === 'unlocked' ? unlocked.has(film.id) : !unlocked.has(film.id)))
+  const unlockedCount = FILMS.filter((film) => unlocked.has(film.id)).length
+  const selectedFilm = getFilm(filmCollection.selectedFilmId)
+
+  return <section className="films-screen screen-enter" aria-labelledby="films-title">
+    <div className="screen-title"><span className="chrome-kicker">FILM COLLECTION</span><h1 id="films-title">{t.filmCollectionTitle}</h1><p>{t.filmCollectionHint}</p></div>
+    <div className="film-collection-summary"><FilmVisual filmId={filmCollection.selectedFilmId} /><div><strong>{formatText(t.filmCollectionProgress, { unlocked: unlockedCount, total: FILMS.length })}</strong><span>{t.filmCurrent}{t[selectedFilm.nameKey]}</span></div><div className="film-count-orb"><b>{unlockedCount}</b><span>/{FILMS.length}</span></div></div>
+    <div className="film-filter-bar" role="tablist" aria-label={t.filmCollectionListLabel}>
+      {[['all', t.filmFilterAll], ['unlocked', t.filmFilterUnlocked], ['locked', t.filmFilterLocked]].map(([key, label]) => <button type="button" key={key} role="tab" aria-selected={filter === key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
+    </div>
+    <div className="film-grid" role="list" aria-label={t.filmCollectionListLabel}>
+      {visibleFilms.length ? visibleFilms.map((film) => {
+        const isUnlocked = unlocked.has(film.id)
+        const isSelected = filmCollection.selectedFilmId === film.id
+        const progress = getFilmProgress(film, completedDays)
+        return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
+          <div className="film-card-top"><FilmVisual filmId={film.id} /><div className="film-status">{isSelected ? <><Icon name="check" size={13} />{t.filmSelected}</> : isUnlocked ? <><Icon name="check" size={13} />{t.filmUnlocked}</> : <><Icon name="lock" size={13} />{t.filmLocked}</>}</div></div>
+          <h2>{t[film.nameKey]}</h2>
+          <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
+          {!isUnlocked ? <div className="film-progress"><div><span>{formatText(t.filmProgress, progress)}</span><b>{progress.current}/{progress.target}</b></div><i><em style={{ width: `${progress.target ? Math.min(100, progress.current / progress.target * 100) : 100}%` }} /></i></div> : null}
+          {isUnlocked && !isSelected ? <button className="film-use-button" type="button" onClick={() => onSelectFilm(film.id)}>{t.useFilm}</button> : null}
+        </article>
+      }) : <div className="film-empty-state"><Icon name="film" size={32} /><strong>{t.filmNoResults}</strong></div>}
+    </div>
+  </section>
+}
+
 function SettingsScreen({ lang, setLang, t }) {
   return (
     <section className="settings-screen screen-enter" aria-labelledby="settings-title">
@@ -1074,7 +1189,7 @@ function RainbowModal({ day, lang, t, exporting, onClose, onSave, onShare, onCap
 
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
-  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
+  return <div className="modal-scrim" role="presentation"><button className="lightbox-dismiss" type="button" onClick={onClose} aria-label={t.close} /><section ref={dialogRef} className="rainbow-lightbox" role="dialog" aria-modal="true" aria-labelledby="modal-date" tabIndex="-1"><h2 className="visually-hidden" id="modal-date">{formatDate(day.date, lang)}</h2><PolaroidCard image={day.cardImage} alt={formatText(t.viewRainbow, { date: formatDate(day.date, lang) })} media={<EnergyStrip photos={day.photos} samples={day.samples} labels={t.colors} />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><div className="lightbox-actions" aria-busy={exporting}><button className="lightbox-save" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="lightbox-share" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div></section></div>
 }
 
 function PrinterShell({ foreground = false }) {
@@ -1096,7 +1211,7 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
   const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><PrinterShell /><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><PrinterShell foreground /></div>
+    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><PrinterShell /><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><PrinterShell foreground /></div>
     <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
     <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
     <button className="result-done" type="button" onClick={onDone}>{t.done}</button>
@@ -1109,6 +1224,7 @@ export default function App() {
   const [day, setDay] = useState(null)
   const [dailyLocked, setDailyLocked] = useState(false)
   const [history, setHistory] = useState([])
+  const [filmCollection, setFilmCollection] = useState(createDefaultFilmCollection)
   const [selectedDay, setSelectedDay] = useState(null)
   const [staged, setStaged] = useState(QA_SAMPLE)
   const [samplerOpen, setSamplerOpen] = useState(false)
@@ -1174,12 +1290,13 @@ export default function App() {
     }
     let active = true
     setLoading(true)
-    loadCollectionState(date).then(({ completedToday, completedDays, dailyLocked: savedDailyLock, draft }) => {
+    loadCollectionState(date).then(({ completedToday, completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection }) => {
       if (!active) return
       const savedDay = completedToday ?? draft
       setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft())
       setDailyLocked(savedDailyLock)
       setHistory(completedDays)
+      setFilmCollection(withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, completedDays)))
     }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) setLoading(false) })
     return () => { active = false; clearTimeout(messageTimer.current) }
   }, [date])
@@ -1191,6 +1308,13 @@ export default function App() {
     setActiveTab(tab)
     location.hash = tab
     resetAppViewport()
+  }
+
+  function selectFilm(filmId) {
+    if (!filmCollection.unlockedFilmIds.includes(filmId) || filmCollection.selectedFilmId === filmId) return
+    const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection({ ...filmCollection, selectedFilmId: filmId }, history))
+    setFilmCollection(nextFilmCollection)
+    saveFilmCollection(nextFilmCollection).catch(() => showMessage(t.error))
   }
 
   async function handleCapture(file, input) {
@@ -1253,12 +1377,16 @@ export default function App() {
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const completedDay = { ...day, schemaVersion: 3, date, cardImage, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const completedDay = { ...day, schemaVersion: 3, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
       await completeDraft(completedDay, date)
       await requestPersistentStorage()
+      const nextHistory = [completedDay, ...history.filter((item) => item.date !== date)]
+      const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection(filmCollection, nextHistory))
+      await saveFilmCollection(nextFilmCollection)
       setDay(completedDay)
       setDailyLocked(true)
-      setHistory((current) => [completedDay, ...current.filter((item) => item.date !== date)])
+      setHistory(nextHistory)
+      setFilmCollection(nextFilmCollection)
       setDevelopedDay(completedDay)
       setComposing(false)
       setBackground(null)
@@ -1357,12 +1485,14 @@ export default function App() {
 
   const screen = activeTab === 'archive'
     ? <ArchiveScreen history={history} lang={lang} t={t} onOpen={setSelectedDay} onRequestDelete={requestDeletePolaroid} />
-    : activeTab === 'settings'
+    : activeTab === 'films'
+      ? <FilmsScreen completedDays={history} filmCollection={filmCollection} lang={lang} t={t} onSelectFilm={selectFilm} />
+      : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} />
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
-          ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} t={t} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
+          ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} t={t} onSelectFilm={selectFilm} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged
@@ -1373,7 +1503,7 @@ export default function App() {
       <a className="skip-link" href="#app-content">{t.skip}</a>
       {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button></header> : null}
       <main id="app-content" className="app-content" tabIndex="-1">{screen}</main>
-      {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
+      {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : key === 'films' ? 'film' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
