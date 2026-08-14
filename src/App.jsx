@@ -326,10 +326,10 @@ function EnergyStrip({ photos, samples = {}, labels, interactive = false, onSele
   )
 }
 
-function PolaroidSourceStrip({ photos = {}, samples = {}, labels }) {
+function PolaroidSourceStrip({ photos = {}, samples = {}, labels, imageLoading = 'lazy' }) {
   return <div className="polaroid-sources" aria-label={labels.join('、')}>{COLOR_KEYS.map((key, index) => (
     <div className="polaroid-source-photo" key={key} style={{ '--sample': samples[key] || FALLBACK_COLORS[key] }}>
-      {photos[key] ? <img src={photos[key]} alt={labels[index]} loading="lazy" /> : <i aria-hidden="true" />}
+      {photos[key] ? <img src={photos[key]} alt={labels[index]} loading={imageLoading} /> : <i aria-hidden="true" />}
     </div>
   ))}</div>
 }
@@ -369,9 +369,9 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
   </section>
 }
 
-function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', decorative = false, children }) {
+function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
-  return <div className={`polaroid-card ${film.className} ${className}`} style={{ ...getPolaroidLayoutStyle(), '--film-paper-fallback': film.paper.middle }} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
+  return <div className={`polaroid-card ${film.className} ${className}`} style={{ ...getPolaroidLayoutStyle(), '--film-paper-fallback': film.paper.middle }} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
 }
 
 function PolaroidCaption({ children, placeholder = false }) {
@@ -1171,22 +1171,50 @@ function PrinterShell({ foreground = false }) {
   return <div className={`printer-shell printer-shell-body ${foreground ? 'printer-shell-mask' : ''}`} aria-hidden="true"><i /><span>NIJI PRINT 2000</span><b /></div>
 }
 
+async function waitForImageElement(image) {
+  if (!image.complete) {
+    await new Promise((resolve) => {
+      const finish = () => {
+        image.removeEventListener('load', finish)
+        image.removeEventListener('error', finish)
+        resolve()
+      }
+      image.addEventListener('load', finish)
+      image.addEventListener('error', finish)
+    })
+  }
+  try { await image.decode?.() } catch { /* a failed thumbnail must not block the completed card */ }
+}
+
 function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
-  const [printComplete, setPrintComplete] = useState(false)
+  const [printPhase, setPrintPhase] = useState('loading')
+  const printedPolaroidRef = useRef(null)
 
   useEffect(() => {
-    setPrintComplete(false)
+    setPrintPhase('loading')
     if (!day) return undefined
+    let active = true
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const timer = window.setTimeout(() => setPrintComplete(true), reducedMotion ? 0 : 1850)
-    return () => window.clearTimeout(timer)
-  }, [day?.date])
+    const preparePrint = async () => {
+      const images = [...(printedPolaroidRef.current?.querySelectorAll('img') ?? [])]
+      await Promise.all([document.fonts?.ready, ...images.map(waitForImageElement)])
+      if (!active) return
+      if (reducedMotion) setPrintPhase('complete')
+      else requestAnimationFrame(() => { if (active) setPrintPhase('printing') })
+    }
+    preparePrint()
+    return () => { active = false }
+  }, [day?.date, day?.cardImage])
+
+  function finishPrintAnimation(event) {
+    if (event.animationName === 'eject-polaroid') setPrintPhase('complete')
+  }
 
   if (!day) return null
   const caption = day.caption ?? t.defaultCaption
   return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
-    <div className={`printer-stage ${printComplete ? 'print-complete' : ''}`} aria-label={t.developedTitle}><PrinterShell /><PolaroidCard className="printed-polaroid" image={day.cardImage} alt={t.developedAlt} overlay={<i className="developing-film" aria-hidden="true" />} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard><PrinterShell foreground /></div>
+    <div className={`printer-stage print-${printPhase}`} aria-label={t.developedTitle} aria-busy={printPhase === 'loading'}><PrinterShell /><div ref={printedPolaroidRef} className="printed-polaroid-motion" onAnimationEnd={finishPrintAnimation}><PolaroidCard className="printed-polaroid" image={day.cardImage} imageLoading="eager" alt={t.developedAlt} photos={day.photos} samples={day.samples} labels={t.colors} date={day.date} lang={lang} filmId={day.filmId}><EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div><PrinterShell foreground /></div>
     <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
     <div className="result-actions" aria-busy={exporting}><button className="save-card-action" type="button" onClick={onSave} disabled={exporting}><Icon name="download" />{exporting ? t.preparingCard : t.saveImage}</button><button className="share-card-action" type="button" onClick={onShare} disabled={exporting}><Icon name="share" />{exporting ? t.preparingCard : t.shareImage}</button></div>
     <button className="result-done" type="button" onClick={onDone}>{t.done}</button>
