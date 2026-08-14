@@ -30,6 +30,8 @@ function Icon({ name, size = 24 }) {
   if (name === 'gear') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.51-1H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.51V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.51 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
   if (name === 'sparkle') return <svg {...common}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3Z" /><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" /></svg>
   if (name === 'back') return <svg {...common}><path d="m15 18-6-6 6-6" /></svg>
+  if (name === 'chevron-down') return <svg {...common}><path d="m6 9 6 6 6-6" /></svg>
+  if (name === 'chevron-up') return <svg {...common}><path d="m6 15 6-6 6 6" /></svg>
   if (name === 'reset') return <svg {...common}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
   if (name === 'check') return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>
   if (name === 'lock') return <svg {...common}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
@@ -380,21 +382,27 @@ function FilmPreviewCard({ filmId, lang, t, className = '' }) {
 }
 
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
+  const [open, setOpen] = useState(false)
   const selectedFilm = getFilm(selectedFilmId)
   return <section className="film-picker" aria-labelledby="film-picker-title">
-    <div className="film-picker-heading"><div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel} · {t[selectedFilm.nameKey]}</strong></div><small>{t.filmPickerHint}</small></div>
-    <div className="film-picker-options" role="group" aria-label={t.filmPickerLabel}>
+    <span className="visually-hidden" id="film-picker-hint">{t.filmPickerHint}</span>
+    <button className={`film-picker-toggle ${open ? 'is-open' : ''}`} type="button" aria-expanded={open} aria-controls="film-picker-options" aria-describedby="film-picker-hint" onClick={() => setOpen((current) => !current)}>
+      <span className="film-picker-toggle-leading"><span className="film-picker-toggle-icon"><Icon name="film" size={18} /></span><span className="film-picker-toggle-copy"><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></span></span>
+      <span className="film-picker-toggle-current">{t[selectedFilm.nameKey]}</span>
+      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} />
+    </button>
+    {open ? <div className="film-picker-options" id="film-picker-options" role="group" aria-label={t.filmPickerLabel}>
       {FILMS.map((film) => {
         const unlocked = unlockedFilmIds.includes(film.id)
         const selected = selectedFilm.id === film.id
         return <button type="button" key={film.id} className={`film-option ${film.className} ${selected ? 'selected' : ''} ${unlocked ? '' : 'locked'}`} disabled={!unlocked} aria-pressed={selected} onClick={() => onSelect(film.id)}>
           <FilmPreviewCard filmId={film.id} lang={lang} t={t} />
-          <span className="film-option-copy"><strong>{t[film.nameKey]}</strong><small>{unlocked ? (selected ? t.filmSelected : t.useFilm) : t.filmLockedShort}</small></span>
+          <strong className="film-option-name">{t[film.nameKey]}</strong>
           {selected ? <span className="film-option-check"><Icon name="check" size={14} /></span> : null}
           {!unlocked ? <span className="film-option-lock"><Icon name="lock" size={13} /></span> : null}
         </button>
       })}
-    </div>
+    </div> : null}
   </section>
 }
 
