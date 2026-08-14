@@ -1,4 +1,4 @@
-const CACHE_NAME = 'niji-diary-shell-v1'
+const CACHE_NAME = 'niji-diary-shell-v2'
 const CACHE_PREFIX = 'niji-diary-shell-'
 const CACHE_TIMEOUT_MS = 3000
 
@@ -15,9 +15,12 @@ async function discoverShellUrls() {
     appUrl('/'),
     appUrl('/index.html'),
     appUrl('/manifest.webmanifest'),
-    appUrl('/rainbow.svg'),
-    appUrl('/icon-192.svg'),
-    appUrl('/icon-512.svg'),
+    appUrl('/logo.svg'),
+    appUrl('/icon-180.png'),
+    appUrl('/icon-192.png'),
+    appUrl('/icon-512.png'),
+    appUrl('/icon-maskable-192.png'),
+    appUrl('/icon-maskable-512.png'),
   ])
 
   try {

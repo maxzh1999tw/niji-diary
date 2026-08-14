@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run icons && vite build",
+    "icons": "node scripts/generate-icons.mjs",
     "preview": "vite preview",
     "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs && node tests/storageModel.test.mjs && node tests/films.test.mjs && node tests/filmRendering.test.mjs"
   },
@@ -15,5 +16,7 @@
     "react": "latest",
     "react-dom": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "sharp": "^0.34.3"
+  }
 }
