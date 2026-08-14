@@ -376,7 +376,7 @@ function FilmPhotoPlaceholder() {
 }
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
-  return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder>{t.filmPreviewCaption}</PolaroidCaption></PolaroidCard>
+  return <PolaroidCard className={`film-preview-card ${className}`} media={<FilmPhotoPlaceholder />} photos={FILM_PREVIEW_PHOTOS} samples={FALLBACK_COLORS} labels={t.colors} date={FILM_PREVIEW_DATE} dateLabel={t.filmPreviewDate} lang={lang} filmId={filmId} decorative><PolaroidCaption placeholder /></PolaroidCard>
 }
 
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
@@ -404,7 +404,7 @@ function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, dat
 }
 
 function PolaroidCaption({ children, placeholder = false }) {
-  return <span className={`polaroid-caption-text ${placeholder ? 'polaroid-caption-placeholder' : ''}`}>{children}</span>
+  return <span className={`polaroid-caption-text ${placeholder ? 'polaroid-caption-placeholder' : ''}`} aria-hidden={placeholder || undefined}>{children}</span>
 }
 
 function EditablePolaroidCaption({ value, t, onChange, onCommit }) {
@@ -1150,7 +1150,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
         const isSelected = filmCollection.selectedFilmId === film.id
         const progress = getFilmProgress(film, completedDays)
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
-          <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><div className="film-status">{isSelected ? <><Icon name="check" size={13} />{t.filmSelected}</> : isUnlocked ? <><Icon name="check" size={13} />{t.filmUnlocked}</> : <><Icon name="lock" size={13} />{t.filmLocked}</>}</div></div>
+          <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><div className="film-status">{isSelected ? <><Icon name="check" size={13} /><span>{t.filmSelected}</span></> : isUnlocked ? <><Icon name="check" size={13} /><span>{t.filmUnlocked}</span></> : <><Icon name="lock" size={13} /><span>{t.filmLocked}</span></>}</div></div>
           <h2>{t[film.nameKey]}</h2>
           <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
           {!isUnlocked ? <div className="film-progress"><div><span>{formatText(t.filmProgress, progress)}</span><b>{progress.current}/{progress.target}</b></div><i><em style={{ width: `${progress.target ? Math.min(100, progress.current / progress.target * 100) : 100}%` }} /></i></div> : null}
