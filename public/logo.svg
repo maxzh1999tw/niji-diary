@@ -1,21 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="logo-title logo-desc">
-  <title id="logo-title">拾色日記標誌</title>
-  <desc id="logo-desc">以彩虹鏡頭結合拍立得相機的幾何標誌</desc>
-  <g fill="none" stroke="#241435" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="174" y="36" width="164" height="190" rx="22" fill="#FFFAF4" stroke-width="18"/>
-    <rect x="196" y="58" width="120" height="105" rx="12" fill="#241435" stroke="none"/>
-    <path d="M208 143V96a48 48 0 0 1 96 0v47" stroke="#FF4FA3" stroke-width="20"/>
-    <path d="M220 143V98a36 36 0 0 1 72 0v45" stroke="#FFD447" stroke-width="16"/>
-    <path d="M232 143v-43a24 24 0 0 1 48 0v43" stroke="#42D9D0" stroke-width="12"/>
-    <path d="M244 143v-41a12 12 0 0 1 24 0v41" stroke="#8B5CF6" stroke-width="8"/>
-    <path d="M126 160h260c34 0 62 28 62 62v196c0 34-28 62-62 62H126c-34 0-62-28-62-62V222c0-34 28-62 62-62Z" fill="#FFFAF4" stroke-width="20"/>
-    <rect x="145" y="180" width="222" height="44" rx="22" fill="#241435" stroke="none"/>
-    <path d="M177 202h158" stroke="#FFFAF4" stroke-width="10"/>
-    <circle cx="256" cy="337" r="108" fill="#FF4FA3" stroke-width="16"/>
-    <circle cx="256" cy="337" r="82" fill="#FFD447" stroke-width="14"/>
-    <circle cx="256" cy="337" r="58" fill="#42D9D0" stroke-width="14"/>
-    <circle cx="256" cy="337" r="34" fill="#8B5CF6" stroke-width="14"/>
-    <circle cx="256" cy="337" r="12" fill="#241435" stroke="none"/>
-    <path d="M390 246v30M375 261h30" stroke-width="12"/>
+  <title id="logo-title">拾色日記彩虹標誌</title>
+  <desc id="logo-desc">三道彩色弧線組成的彩虹標誌</desc>
+  <rect x="24" y="24" width="464" height="464" rx="120" fill="#FFFAF4"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M96 344a160 160 0 0 1 320 0" stroke="#F45B69" stroke-width="58"/>
+    <path d="M144 344a112 112 0 0 1 224 0" stroke="#FFC857" stroke-width="50"/>
+    <path d="M192 344a64 64 0 0 1 128 0" stroke="#43AA8B" stroke-width="42"/>
   </g>
 </svg>
