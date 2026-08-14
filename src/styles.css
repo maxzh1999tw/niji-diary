@@ -248,8 +248,13 @@ img { max-width: 100%; }
   }
 }
 
-.film-grid { align-items: start; }
+.film-grid { align-items: stretch; }
 .film-card.unlocked { min-height: 0; }
+.film-status { gap: 3px; padding: 5px 9px 5px 5px; }
+
+@media (max-width: 760px) {
+  .film-status { gap: 2px; padding: 3px 7px 3px 2px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
