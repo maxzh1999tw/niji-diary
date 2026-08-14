@@ -1879,7 +1879,7 @@ export default function App() {
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />
     <div className={`app-shell ${immersiveEditor ? 'immersive-editor' : ''}`}>
       <a className="skip-link" href="#app-content">{t.skip}</a>
-      {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><span className="logo-orb"><i /></span><span><b>NIJI</b><small>{t.brand}</small></span></button></header> : null}
+      {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><img className="app-brand-mark" src="./logo.svg" alt="" aria-hidden="true" /><span><b>NIJI</b><small>{t.brand}</small></span></button></header> : null}
       <main id="app-content" className="app-content" tabIndex="-1">{screen}</main>
       {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : key === 'films' ? 'film' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}

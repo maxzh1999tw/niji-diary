@@ -3,8 +3,8 @@
   <desc id="logo-desc">三道彩色弧線組成的彩虹標誌</desc>
   <rect x="24" y="24" width="464" height="464" rx="120" fill="#FFFAF4"/>
   <g fill="none" stroke-linecap="round">
-    <path d="M96 344a160 160 0 0 1 320 0" stroke="#F45B69" stroke-width="58"/>
-    <path d="M144 344a112 112 0 0 1 224 0" stroke="#FFC857" stroke-width="50"/>
-    <path d="M192 344a64 64 0 0 1 128 0" stroke="#43AA8B" stroke-width="42"/>
+    <path d="M70 360a186 186 0 0 1 372 0" stroke="#F45B69" stroke-width="70"/>
+    <path d="M126 360a130 130 0 0 1 260 0" stroke="#FFC857" stroke-width="58"/>
+    <path d="M182 360a74 74 0 0 1 148 0" stroke="#43AA8B" stroke-width="48"/>
   </g>
 </svg>
