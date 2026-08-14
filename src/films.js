@@ -14,7 +14,7 @@ export const FILMS = [
     conditionKey: 'filmClassicCondition',
     unlock: { type: 'always', target: 0 },
     paper: { top: '#ffffff', middle: '#fdfcf9', bottom: '#f5f3ee', accent: '#d7d0dc' },
-    decoration: 'none',
+    artwork: [],
   },
   {
     id: 'sky-blue',
@@ -23,7 +23,14 @@ export const FILMS = [
     conditionKey: 'filmSkyBlueCondition',
     unlock: { type: 'completed-count', target: 1 },
     paper: { top: '#f3fcff', middle: '#d9f6ff', bottom: '#bfeaf5', accent: '#56c9df' },
-    decoration: 'clouds',
+    artwork: [
+      { type: 'circle', cx: 88, cy: 1305, radius: 26, opacity: 0.42 },
+      { type: 'circle', cx: 134, cy: 1322, radius: 38, opacity: 0.42 },
+      { type: 'circle', cx: 180, cy: 1308, radius: 23, opacity: 0.42 },
+      { type: 'circle', cx: 840, cy: 1368, radius: 30, opacity: 0.42 },
+      { type: 'circle', cx: 895, cy: 1350, radius: 45, opacity: 0.42 },
+      { type: 'circle', cx: 945, cy: 1372, radius: 24, opacity: 0.42 },
+    ],
   },
   {
     id: 'pink-pop',
@@ -32,7 +39,18 @@ export const FILMS = [
     conditionKey: 'filmPinkCondition',
     unlock: { type: 'consecutive-days', target: 3 },
     paper: { top: '#fff7fc', middle: '#ffe1f0', bottom: '#ffc6df', accent: '#f17aae' },
-    decoration: 'confetti',
+    artwork: [
+      { type: 'rect', cx: 78, cy: 1290, width: 12, height: 44, rotation: -20, opacity: 0.42 },
+      { type: 'rect', cx: 145, cy: 1370, width: 12, height: 44, rotation: 37, opacity: 0.42 },
+      { type: 'rect', cx: 240, cy: 1325, width: 12, height: 44, rotation: -43, opacity: 0.42 },
+      { type: 'rect', cx: 800, cy: 1322, width: 12, height: 44, rotation: 29, opacity: 0.42 },
+      { type: 'rect', cx: 884, cy: 1382, width: 12, height: 44, rotation: -26, opacity: 0.42 },
+      { type: 'rect', cx: 950, cy: 1285, width: 12, height: 44, rotation: 20, opacity: 0.42 },
+      { type: 'circle', cx: 105, cy: 1390, radius: 10, opacity: 0.65 },
+      { type: 'circle', cx: 205, cy: 1288, radius: 10, opacity: 0.65 },
+      { type: 'circle', cx: 830, cy: 1288, radius: 10, opacity: 0.65 },
+      { type: 'circle', cx: 915, cy: 1322, radius: 10, opacity: 0.65 },
+    ],
   },
   {
     id: 'mint-green',
@@ -41,7 +59,12 @@ export const FILMS = [
     conditionKey: 'filmMintGreenCondition',
     unlock: { type: 'all-green-rainbow', target: 1 },
     paper: { top: '#f8fff6', middle: '#e1f7d9', bottom: '#c5eac0', accent: '#73bd7d' },
-    decoration: 'leaves',
+    artwork: [
+      { type: 'ellipse', cx: 92, cy: 1320, radiusX: 13, radiusY: 29, rotation: -37, opacity: 0.42 },
+      { type: 'ellipse', cx: 155, cy: 1370, radiusX: 13, radiusY: 29, rotation: 20, opacity: 0.42 },
+      { type: 'ellipse', cx: 870, cy: 1320, radiusX: 13, radiusY: 29, rotation: 32, opacity: 0.42 },
+      { type: 'ellipse', cx: 935, cy: 1370, radiusX: 13, radiusY: 29, rotation: -23, opacity: 0.42 },
+    ],
   },
 ]
 

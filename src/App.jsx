@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, normalizeFilmCollection } from './films.js'
+import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { completeDraft, deleteDay, loadCollectionState, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
@@ -12,7 +13,9 @@ const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', 
 const FILM_PREVIEW_DATE = '2000-01-01'
 const FILM_PREVIEW_PHOTOS = {}
 const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
-const QA_MODE = import.meta.env.DEV ? new URLSearchParams(location.search).get('qa') : null
+const DEV_QUERY = import.meta.env.DEV ? new URLSearchParams(location.search) : null
+const QA_MODE = DEV_QUERY?.get('qa') ?? null
+const QA_FILM_ID = DEV_QUERY?.get('film') ?? null
 const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
 
 function Icon({ name, size = 24 }) {
@@ -53,7 +56,9 @@ function withoutFilmCollectionMeta(collection) {
 }
 
 function createDefaultFilmCollection() {
-  return withoutFilmCollectionMeta(normalizeFilmCollection(null))
+  const collection = withoutFilmCollectionMeta(normalizeFilmCollection(null))
+  if (!QA_MODE || !FILMS.some((film) => film.id === QA_FILM_ID)) return collection
+  return { ...collection, unlockedFilmIds: FILMS.map((film) => film.id), selectedFilmId: QA_FILM_ID }
 }
 
 function readPendingFilmSelection() {
@@ -166,109 +171,48 @@ function fitCanvasText(context, text, maxWidth) {
   return `${fitted}…`
 }
 
-function drawFilmDecorations(context, film, width, height) {
-  context.save()
-  context.globalAlpha = 0.42
-  context.fillStyle = film.paper.accent
-  context.strokeStyle = film.paper.accent
-  context.lineWidth = 8
-
-  if (film.decoration === 'clouds') {
-    for (const [x, y, radius] of [[88, 1305, 26], [134, 1322, 38], [180, 1308, 23], [840, 1368, 30], [895, 1350, 45], [945, 1372, 24]]) {
-      context.beginPath()
-      context.arc(x, y, radius, 0, Math.PI * 2)
-      context.fill()
-    }
-  }
-
-  if (film.decoration === 'confetti') {
-    for (const [x, y, rotation] of [[78, 1290, -0.35], [145, 1370, 0.65], [240, 1325, -0.75], [800, 1322, 0.5], [884, 1382, -0.45], [950, 1285, 0.35]]) {
-      context.save()
-      context.translate(x, y)
-      context.rotate(rotation)
-      context.fillRect(-6, -22, 12, 44)
-      context.restore()
-    }
-    context.globalAlpha = 0.65
-    for (const [x, y] of [[105, 1390], [205, 1288], [830, 1288], [915, 1322]]) {
-      context.beginPath()
-      context.arc(x, y, 10, 0, Math.PI * 2)
-      context.fill()
-    }
-  }
-
-  if (film.decoration === 'leaves') {
-    for (const [x, y, rotation] of [[92, 1320, -0.65], [155, 1370, 0.35], [870, 1320, 0.55], [935, 1370, -0.4]]) {
-      context.save()
-      context.translate(x, y)
-      context.rotate(rotation)
-      context.beginPath()
-      context.ellipse(0, 0, 13, 29, 0, 0, Math.PI * 2)
-      context.fill()
-      context.restore()
-    }
-  }
-
-  context.restore()
-}
-
 async function renderPolaroidImage(day, lang, fallbackCaption) {
   if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
   await document.fonts?.ready
-  const film = getFilm(day.filmId)
-  const width = 1000
-  const height = 1500
+  const renderModel = getFilmRenderModel(day.filmId)
+  const { width, height, photo, sources, footer } = renderModel.layout
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
-  const paper = context.createLinearGradient(0, 0, width, height)
-  paper.addColorStop(0, film.paper.top)
-  paper.addColorStop(0.58, film.paper.middle)
-  paper.addColorStop(1, film.paper.bottom)
-  context.fillStyle = paper
-  context.fillRect(0, 0, width, height)
-  drawFilmDecorations(context, film, width, height)
+  const filmSurface = await loadImageSource(renderModel.surfaceUrl)
+  context.drawImage(filmSurface, 0, 0, width, height)
 
   const mainImage = await loadImageSource(day.cardImage)
-  const photoX = 35
-  const photoY = 35
-  const photoWidth = 930
-  const photoHeight = 1162.5
   context.fillStyle = '#e8e1ec'
-  context.fillRect(photoX, photoY, photoWidth, photoHeight)
-  drawCoverAt(context, mainImage, photoX, photoY, photoWidth, photoHeight)
+  context.fillRect(photo.x, photo.y, photo.width, photo.height)
+  drawCoverAt(context, mainImage, photo.x, photo.y, photo.width, photo.height)
   context.strokeStyle = 'rgba(18,13,21,.1)'
   context.lineWidth = 2
-  context.strokeRect(photoX, photoY, photoWidth, photoHeight)
+  context.strokeRect(photo.x, photo.y, photo.width, photo.height)
 
-  const sourceY = 1221.5
-  const sourceHeight = 115
-  const sourceGap = 11.5
-  const sourceStartX = 42
-  const sourceAreaWidth = 916
-  const sourceWidth = (sourceAreaWidth - sourceGap * 6) / 7
+  const sourceWidth = (sources.width - sources.gap * 6) / 7
   const sourceImages = await Promise.all(COLOR_KEYS.map(async (key) => {
     if (!day.photos?.[key]) return null
     try { return await loadImageSource(day.photos[key]) } catch { return null }
   }))
 
   COLOR_KEYS.forEach((key, index) => {
-    const x = sourceStartX + index * (sourceWidth + sourceGap)
+    const x = sources.x + index * (sourceWidth + sources.gap)
     context.fillStyle = '#fffefa'
-    context.fillRect(x, sourceY, sourceWidth, sourceHeight)
+    context.fillRect(x, sources.y, sourceWidth, sources.height)
     context.strokeStyle = 'rgba(69,60,67,.2)'
     context.lineWidth = 1.5
-    context.strokeRect(x, sourceY, sourceWidth, sourceHeight)
-    const innerX = x + 7
-    const innerY = sourceY + 7
-    const innerWidth = sourceWidth - 14
-    const innerHeight = sourceHeight - 22
+    context.strokeRect(x, sources.y, sourceWidth, sources.height)
+    const innerX = x + sources.innerX
+    const innerY = sources.y + sources.innerY
+    const innerWidth = sourceWidth - sources.innerX * 2
+    const innerHeight = sources.height - sources.innerBottom
     context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
     context.fillRect(innerX, innerY, innerWidth, innerHeight)
     if (sourceImages[index]) drawCoverAt(context, sourceImages[index], innerX, innerY, innerWidth, innerHeight)
     context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
-    context.fillRect(x, sourceY + sourceHeight - 8, sourceWidth, 8)
+    context.fillRect(x, sources.y + sources.height - sources.accentHeight, sourceWidth, sources.accentHeight)
   })
 
   const caption = day.caption ?? fallbackCaption
@@ -276,12 +220,11 @@ async function renderPolaroidImage(day, lang, fallbackCaption) {
   context.textBaseline = 'middle'
   context.fillStyle = '#241435'
   context.font = '600 45px "Noto Sans TC", "Segoe UI", sans-serif'
-  const dateWidth = 220
-  context.fillText(fitCanvasText(context, caption, width - 100 - dateWidth), 50, 1418)
+  context.fillText(fitCanvasText(context, caption, width - footer.x * 2 - footer.dateWidth), footer.x, footer.textY)
   context.fillStyle = '#625c63'
   context.font = '600 34px "Noto Sans TC", "Segoe UI", sans-serif'
   context.textAlign = 'right'
-  context.fillText(dateText, 950, 1418)
+  context.fillText(dateText, width - footer.x, footer.textY)
   context.textAlign = 'left'
   return canvas.toDataURL('image/png')
 }
@@ -395,9 +338,9 @@ function FilmPhotoPlaceholder() {
   return <div className="film-photo-placeholder" aria-hidden="true" />
 }
 
-function getFilmPaperStyle(filmId) {
-  const paper = getFilm(filmId).paper
-  return { '--film-paper-top': paper.top, '--film-paper-middle': paper.middle, '--film-paper-bottom': paper.bottom, '--film-paper-accent': paper.accent }
+function FilmSurface({ filmId }) {
+  const { surfaceUrl } = getFilmRenderModel(filmId)
+  return <img className="film-surface-artwork" src={surfaceUrl} alt="" aria-hidden="true" draggable="false" />
 }
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
@@ -426,9 +369,9 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
   </section>
 }
 
-function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', decorative = false, children }) {
+function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', decorative = false, children }) {
   const film = getFilm(filmId)
-  return <div className={`polaroid-card ${film.className} ${className}`} style={getFilmPaperStyle(filmId)} aria-hidden={decorative || undefined}><div className="polaroid-photo">{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
+  return <div className={`polaroid-card ${film.className} ${className}`} style={{ ...getPolaroidLayoutStyle(), '--film-paper-fallback': film.paper.middle }} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading="lazy" /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
 }
 
 function PolaroidCaption({ children, placeholder = false }) {
@@ -653,7 +596,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
   )
 }
 
-function ComposeScreen({ background, samples, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
+function ComposeScreen({ background, photos, samples, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
   const [activeTool, setActiveTool] = useState('transparency')
   const pointers = useRef(new Map())
   const gesture = useRef(null)
@@ -755,12 +698,10 @@ function ComposeScreen({ background, samples, transform, setTransform, selectedF
     { key: 'film', icon: 'film', label: t.filmPickerLabel },
   ]
   const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
-  const selectedFilm = getFilm(selectedFilmId)
-
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><div className={`composition-canvas ${selectedFilm.className}`} style={getFilmPaperStyle(selectedFilmId)}><div className="composition-canvas-photo"><img src={background} alt={t.backgroundAlt} /><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></div></div></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><PolaroidCaption>{t.defaultCaption}</PolaroidCaption></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>)}</div>
@@ -1542,7 +1483,7 @@ export default function App() {
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
-          ? <ComposeScreen background={background} samples={day?.samples ?? {}} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onSelectFilm={selectFilm} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
+          ? <ComposeScreen background={background} photos={day?.photos ?? {}} samples={day?.samples ?? {}} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onSelectFilm={selectFilm} onCapture={handleBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged
