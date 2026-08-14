@@ -8,7 +8,8 @@ export const COMPLETED_DAY_SCHEMA_VERSION = 5
 
 export const ACTIVE_DRAFT_KEY = '__active-draft__'
 export const FILM_COLLECTION_KEY = '__film-collection__'
-const COMPLETION_GATE_KEY = '__completion-gate__'
+export const COMPLETION_GATE_KEY = '__completion-gate__'
+export const STORAGE_SNAPSHOT_SCHEMA_VERSION = 1
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 function openDB() {
@@ -46,6 +47,172 @@ function getAllRecords() {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   }).finally(() => db.close()))
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function createStorageError(code, message) {
+  const error = new Error(message)
+  error.code = code
+  return error
+}
+
+export async function exportIndexedDBRecords() {
+  return getAllRecords()
+}
+
+export function validateStorageSnapshot(snapshot) {
+  if (!isRecord(snapshot) || snapshot.schemaVersion !== STORAGE_SNAPSHOT_SCHEMA_VERSION) {
+    throw createStorageError('invalid-snapshot', 'Unsupported storage snapshot version')
+  }
+
+  const records = snapshot.indexedDB?.records
+  if (!Array.isArray(records)) throw createStorageError('invalid-snapshot', 'IndexedDB records are missing')
+  const normalizedRecords = records.map((record) => {
+    if (!isRecord(record) || typeof record.date !== 'string' || !record.date || record.date.length > 256) {
+      throw createStorageError('invalid-snapshot', 'IndexedDB record is invalid')
+    }
+    return { ...record }
+  })
+
+  const localStorage = snapshot.localStorage ?? []
+  if (!Array.isArray(localStorage)) throw createStorageError('invalid-snapshot', 'localStorage entries are invalid')
+  const normalizedLocalStorage = localStorage.map((entry) => {
+    if (!isRecord(entry) || typeof entry.key !== 'string' || typeof entry.value !== 'string' || entry.key.length > 1024) {
+      throw createStorageError('invalid-snapshot', 'localStorage entry is invalid')
+    }
+    return { key: entry.key, value: entry.value }
+  })
+
+  return {
+    schemaVersion: STORAGE_SNAPSHOT_SCHEMA_VERSION,
+    indexedDB: { ...snapshot.indexedDB, records: normalizedRecords },
+    localStorage: normalizedLocalStorage,
+  }
+}
+
+function hasEntries(value) {
+  return isRecord(value) && Object.keys(value).length > 0
+}
+
+function hasMeaningfulDraft(record) {
+  return hasEntries(record?.photos)
+    || hasEntries(record?.samples)
+    || Boolean(record?.caption || record?.background || record?.cardImage || record?.composition)
+}
+
+function latestCalendarDate(...dates) {
+  return dates
+    .filter((date) => typeof date === 'string' && CALENDAR_DATE_PATTERN.test(date))
+    .sort((a, b) => a.localeCompare(b))
+    .at(-1)
+}
+
+function mergeCompletionGate(incoming, existing) {
+  return {
+    ...incoming,
+    ...existing,
+    date: COMPLETION_GATE_KEY,
+    lastCompletedDate: latestCalendarDate(existing.lastCompletedDate, incoming.lastCompletedDate)
+      ?? existing.lastCompletedDate
+      ?? incoming.lastCompletedDate,
+  }
+}
+
+function mergeFilmCollection(incoming, existing) {
+  const unlockedFilmIds = [...new Set([
+    ...(Array.isArray(incoming.unlockedFilmIds) ? incoming.unlockedFilmIds : []),
+    ...(Array.isArray(existing.unlockedFilmIds) ? existing.unlockedFilmIds : []),
+  ].filter((filmId) => typeof filmId === 'string'))]
+  const destinationSelected = typeof existing.selectedFilmId === 'string' && unlockedFilmIds.includes(existing.selectedFilmId)
+    ? existing.selectedFilmId
+    : null
+  const sourceSelected = typeof incoming.selectedFilmId === 'string' && unlockedFilmIds.includes(incoming.selectedFilmId)
+    ? incoming.selectedFilmId
+    : null
+
+  return {
+    ...incoming,
+    ...existing,
+    date: FILM_COLLECTION_KEY,
+    unlockedFilmIds,
+    selectedFilmId: destinationSelected ?? sourceSelected ?? existing.selectedFilmId ?? incoming.selectedFilmId,
+  }
+}
+
+function mergeActiveDraft(incoming, existing) {
+  return hasMeaningfulDraft(existing)
+    ? { ...incoming, ...existing, date: ACTIVE_DRAFT_KEY }
+    : { ...existing, ...incoming, date: ACTIVE_DRAFT_KEY }
+}
+
+function valuesEqual(left, right) {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => valuesEqual(value, right[index]))
+  }
+  if (isRecord(left) || isRecord(right)) {
+    if (!isRecord(left) || !isRecord(right)) return false
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+    return [...keys].every((key) => valuesEqual(left[key], right[key]))
+  }
+  return false
+}
+
+function recordsEqual(left, right) {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+  return [...keys].every((key) => valuesEqual(left[key], right[key]))
+}
+
+export function mergeStorageRecords(existingRecords, incomingRecords) {
+  const merged = new Map(existingRecords.filter((record) => isRecord(record) && typeof record.date === 'string').map((record) => [record.date, record]))
+  const recordsToWrite = []
+  let importedRecords = 0
+  let mergedRecords = 0
+  let skippedRecords = 0
+
+  for (const incoming of incomingRecords) {
+    const existing = merged.get(incoming.date)
+    if (!existing) {
+      merged.set(incoming.date, incoming)
+      recordsToWrite.push(incoming)
+      importedRecords += 1
+      continue
+    }
+
+    let combined = existing
+    if (incoming.date === COMPLETION_GATE_KEY) combined = mergeCompletionGate(incoming, existing)
+    if (incoming.date === FILM_COLLECTION_KEY) combined = mergeFilmCollection(incoming, existing)
+    if (incoming.date === ACTIVE_DRAFT_KEY) combined = mergeActiveDraft(incoming, existing)
+
+    if (combined === existing || recordsEqual(combined, existing)) {
+      skippedRecords += 1
+      continue
+    }
+    merged.set(incoming.date, combined)
+    recordsToWrite.push(combined)
+    mergedRecords += 1
+  }
+
+  return {
+    records: [...merged.values()],
+    recordsToWrite,
+    importedRecords,
+    mergedRecords,
+    skippedRecords,
+  }
+}
+
+export function saveImportedRecords(records) {
+  if (!records.length) return Promise.resolve(0)
+  return transact('readwrite', (store) => {
+    records.forEach((record) => store.put(record))
+    return records.length
+  })
 }
 
 export function deriveCollectionState(records, today) {

@@ -5,6 +5,7 @@ import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChange
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
+import { importStorageSnapshot, LEGACY_IMPORT_OFFER, LEGACY_IMPORT_READY, LEGACY_IMPORT_RESPONSE, LEGACY_ORIGIN, NEW_APP_ORIGIN, sendLegacyStorageToNewSite } from './migration.js'
 import { COMPLETED_DAY_SCHEMA_VERSION, completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
@@ -286,6 +287,33 @@ async function compactCompletedHistory(completedDays, lang, fallbackCaption) {
     ))
   }
   return compactedDays
+}
+
+async function hydrateCollectionState(date, lang) {
+  const { completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection } = await loadCollectionState(date)
+  const compactedDays = await compactCompletedHistory(completedDays, lang, translations[lang].defaultCaption)
+  const completedToday = compactedDays.find((item) => item.date === date) ?? null
+  const savedDay = completedToday ?? draft
+  const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, compactedDays))
+  const pendingFilmId = readPendingFilmSelection()
+  const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
+    ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, compactedDays))
+    : hydratedFilmCollection
+
+  if (pendingFilmId) {
+    if (recoveredFilmCollection.selectedFilmId === pendingFilmId) {
+      saveFilmCollection(recoveredFilmCollection).then(() => clearPendingFilmSelection(pendingFilmId)).catch(() => {})
+    } else {
+      clearPendingFilmSelection(pendingFilmId)
+    }
+  }
+
+  return {
+    day: savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft(),
+    dailyLocked: savedDailyLock,
+    history: compactedDays,
+    filmCollection: recoveredFilmCollection,
+  }
 }
 
 async function getCompletedPolaroidImage(day, lang, fallbackCaption) {
@@ -1345,7 +1373,19 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
   </section>
 }
 
-function SettingsScreen({ lang, setLang, t }) {
+function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, onMigrate }) {
+  const migrationBusy = migrationState.status === 'sending'
+  const migrationStatus = migrationState.status === 'success'
+    ? formatText(t.migrationSuccess, {
+      imported: migrationState.importedRecords,
+      merged: migrationState.mergedRecords,
+      skipped: migrationState.skippedRecords,
+      localStorage: migrationState.importedLocalStorage,
+    })
+    : migrationState.status === 'error'
+      ? migrationState.errorCode === 'popup-blocked' ? t.migrationPopupBlocked : migrationState.errorCode === 'timeout' ? t.migrationTimeout : t.migrationError
+      : migrationState.status === 'sending' ? t.migrationSendingHint : ''
+
   return (
     <section className="settings-screen screen-enter" aria-labelledby="settings-title">
       <div className="screen-title"><span className="chrome-kicker">SYSTEM 2000</span><h1 id="settings-title">{t.settingsTitle}</h1><p>{t.settingsHint}</p></div>
@@ -1353,6 +1393,17 @@ function SettingsScreen({ lang, setLang, t }) {
         <label htmlFor="language">{t.language}</label>
         <select id="language" value={lang} onChange={(event) => setLang(event.target.value)}>{Object.entries(LANGUAGE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select>
       </div>
+      {migrationEnabled ? <div className={`settings-card migration-card migration-${migrationState.status}`} aria-busy={migrationBusy}>
+        <div className="migration-card-icon"><Icon name="upload" size={28} /></div>
+        <div className="migration-card-copy">
+          <span className="settings-card-kicker">LEGACY DATA</span>
+          <strong>{t.migrationTitle}</strong>
+          <p>{t.migrationHint}</p>
+          <small>{t.migrationTarget}</small>
+          {migrationStatus ? <p className="migration-status" role="status" aria-live="polite">{migrationStatus}</p> : null}
+        </div>
+        <button className="y2k-button migration-button" type="button" onClick={onMigrate} disabled={migrationBusy}><Icon name={migrationBusy ? 'sparkle' : 'upload'} size={19} />{migrationBusy ? t.migrationSending : t.migrationButton}</button>
+      </div> : null}
       <div className="settings-card info-card"><Icon name="lock" /><div><strong>{t.privateTitle}</strong><p>{t.privateHint}</p></div></div>
       <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v2.0 · Y2K EDITION</small></div>
     </section>
@@ -1457,7 +1508,10 @@ export default function App() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [deletingPolaroid, setDeletingPolaroid] = useState(false)
   const [message, setMessage] = useState('')
+  const [migrationState, setMigrationState] = useState({ status: 'idle' })
   const messageTimer = useRef(null)
+  const hydrationRequestRef = useRef(0)
+  const incomingMigrationRequests = useRef(new Set())
   const [date, setDate] = useState(localDateKey)
   const t = translations[lang]
   const photos = day?.photos ?? {}
@@ -1467,6 +1521,73 @@ export default function App() {
     clearTimeout(messageTimer.current)
     setMessage(text)
     messageTimer.current = setTimeout(() => setMessage(''), 3200)
+  }
+
+  function applyHydratedCollectionState(hydrated) {
+    setDay(hydrated.day)
+    setDailyLocked(hydrated.dailyLocked)
+    setHistory(hydrated.history)
+    setFilmCollection(hydrated.filmCollection)
+  }
+
+  async function refreshCollectionStateAfterMigration() {
+    const hydrationRequest = ++hydrationRequestRef.current
+    setFilmCollectionReady(false)
+    try {
+      const hydrated = await hydrateCollectionState(date, lang)
+      if (hydrationRequest === hydrationRequestRef.current) applyHydratedCollectionState(hydrated)
+    } finally {
+      if (hydrationRequest === hydrationRequestRef.current) {
+        setLoading(false)
+        setFilmCollectionReady(true)
+      }
+    }
+  }
+
+  function formatMigrationSuccess(result) {
+    return formatText(t.migrationSuccess, {
+      imported: result.importedRecords,
+      merged: result.mergedRecords,
+      skipped: result.skippedRecords,
+      localStorage: result.importedLocalStorage,
+    })
+  }
+
+  function migrationErrorMessage(error) {
+    if (error?.code === 'popup-blocked') return t.migrationPopupBlocked
+    if (error?.code === 'timeout') return t.migrationTimeout
+    return t.migrationError
+  }
+
+  async function handleLegacyMigration() {
+    if (migrationState.status === 'sending') return
+    setMigrationState({ status: 'sending' })
+    try {
+      const result = await sendLegacyStorageToNewSite()
+      setMigrationState({ status: 'success', ...result })
+      showMessage(result.importedRecords || result.mergedRecords || result.importedLocalStorage ? formatMigrationSuccess(result) : t.migrationNoData)
+    } catch (error) {
+      setMigrationState({ status: 'error', errorCode: error?.code })
+      showMessage(migrationErrorMessage(error))
+    }
+  }
+
+  async function acceptLegacyMigration(messageData, source, origin) {
+    try {
+      const result = await importStorageSnapshot(messageData.snapshot)
+      try {
+        await refreshCollectionStateAfterMigration()
+      } catch {
+        showMessage(t.error)
+      }
+      setMigrationState({ status: 'success', ...result })
+      showMessage(result.importedRecords || result.mergedRecords || result.importedLocalStorage ? formatMigrationSuccess(result) : t.migrationNoData)
+      source?.postMessage({ type: LEGACY_IMPORT_RESPONSE, requestId: messageData.requestId, ok: true, result }, origin)
+    } catch (error) {
+      setMigrationState({ status: 'error', errorCode: error?.code })
+      showMessage(migrationErrorMessage(error))
+      source?.postMessage({ type: LEGACY_IMPORT_RESPONSE, requestId: messageData.requestId, ok: false, errorCode: error?.code || 'import-failed' }, origin)
+    }
   }
 
   useEffect(() => {
@@ -1493,6 +1614,22 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (QA_MODE || location.origin !== NEW_APP_ORIGIN) return undefined
+    const handleLegacyMigration = (event) => {
+      if (event.origin !== LEGACY_ORIGIN) return
+      if (window.opener && event.source !== window.opener) return
+      const messageData = event.data
+      if (!messageData || messageData.type !== LEGACY_IMPORT_OFFER || typeof messageData.requestId !== 'string' || !messageData.snapshot) return
+      if (incomingMigrationRequests.current.has(messageData.requestId)) return
+      incomingMigrationRequests.current.add(messageData.requestId)
+      void acceptLegacyMigration(messageData, event.source, event.origin)
+    }
+    window.addEventListener('message', handleLegacyMigration)
+    window.opener?.postMessage({ type: LEGACY_IMPORT_READY }, LEGACY_ORIGIN)
+    return () => window.removeEventListener('message', handleLegacyMigration)
+  }, [date, lang])
+
+  useEffect(() => {
     if (QA_MODE) {
       const qaPhotos = Object.fromEntries(COLOR_KEYS.map((key) => [key, './rainbow.svg']))
       const qaCompleted = QA_MODE === 'result' || QA_MODE === 'album'
@@ -1508,31 +1645,18 @@ export default function App() {
       return undefined
     }
     let active = true
+    const hydrationRequest = ++hydrationRequestRef.current
     setLoading(true)
     setFilmCollectionReady(false)
-    loadCollectionState(date).then(async ({ completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection }) => {
-      const compactedDays = await compactCompletedHistory(completedDays, lang, translations[lang].defaultCaption)
-      if (!active) return
-      const completedToday = compactedDays.find((item) => item.date === date) ?? null
-      const savedDay = completedToday ?? draft
-      const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, compactedDays))
-      const pendingFilmId = readPendingFilmSelection()
-      const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
-        ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, compactedDays))
-        : hydratedFilmCollection
-      setDay(savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft())
-      setDailyLocked(savedDailyLock)
-      setHistory(compactedDays)
-      setFilmCollection(recoveredFilmCollection)
-      setFilmCollectionReady(true)
-      if (pendingFilmId) {
-        if (recoveredFilmCollection.selectedFilmId === pendingFilmId) {
-          saveFilmCollection(recoveredFilmCollection).then(() => clearPendingFilmSelection(pendingFilmId)).catch(() => {})
-        } else {
-          clearPendingFilmSelection(pendingFilmId)
-        }
+    hydrateCollectionState(date, lang).then((hydrated) => {
+      if (!active || hydrationRequest !== hydrationRequestRef.current) return
+      applyHydratedCollectionState(hydrated)
+    }).catch(() => showMessage(translations[lang].error)).finally(() => {
+      if (active && hydrationRequest === hydrationRequestRef.current) {
+        setLoading(false)
+        setFilmCollectionReady(true)
       }
-    }).catch(() => showMessage(translations[lang].error)).finally(() => { if (active) { setLoading(false); setFilmCollectionReady(true) } })
+    })
     return () => { active = false; clearTimeout(messageTimer.current) }
   }, [date])
 
@@ -1742,7 +1866,7 @@ export default function App() {
     : activeTab === 'films'
       ? <FilmsScreen completedDays={history} filmCollection={filmCollection} lang={lang} t={t} onSelectFilm={selectFilm} />
       : activeTab === 'settings'
-      ? <SettingsScreen lang={lang} setLang={setLang} t={t} />
+      ? <SettingsScreen lang={lang} setLang={setLang} t={t} migrationEnabled={location.origin === LEGACY_ORIGIN} migrationState={migrationState} onMigrate={handleLegacyMigration} />
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing

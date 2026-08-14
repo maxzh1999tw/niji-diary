@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { ACTIVE_DRAFT_KEY, COMPLETED_DAY_SCHEMA_VERSION, completedDayNeedsCompaction, createCompletedDayRecord, deriveCollectionState, migrateCompletedDay } from '../src/storage.js'
+import { ACTIVE_DRAFT_KEY, COMPLETED_DAY_SCHEMA_VERSION, COMPLETION_GATE_KEY, FILM_COLLECTION_KEY, STORAGE_SNAPSHOT_SCHEMA_VERSION, completedDayNeedsCompaction, createCompletedDayRecord, deriveCollectionState, mergeStorageRecords, migrateCompletedDay, validateStorageSnapshot } from '../src/storage.js'
 
 const legacyRecords = [
   { date: '2026-08-01', photos: { red: 'old-red' }, samples: { red: '#aa0000' }, completedAt: null },
@@ -95,5 +95,50 @@ let compactRenderCalled = false
 const unchangedCompactRecord = await migrateCompletedDay(completedRecord, async () => { compactRenderCalled = true })
 assert.equal(unchangedCompactRecord, completedRecord)
 assert.equal(compactRenderCalled, false)
+
+const destinationOnlyRecord = { date: '2026-08-14', completedAt: '2026-08-14T12:00:00.000Z', polaroidImage: 'destination-polaroid' }
+const importedRecord = { date: '2026-08-13', completedAt: '2026-08-13T12:00:00.000Z', polaroidImage: 'legacy-polaroid' }
+const additiveMerge = mergeStorageRecords([destinationOnlyRecord], [destinationOnlyRecord, importedRecord])
+assert.equal(additiveMerge.importedRecords, 1)
+assert.equal(additiveMerge.skippedRecords, 1)
+assert.equal(additiveMerge.records.find((record) => record.date === destinationOnlyRecord.date), destinationOnlyRecord)
+assert.equal(additiveMerge.records.find((record) => record.date === importedRecord.date), importedRecord)
+
+const completionMerge = mergeStorageRecords(
+  [{ date: COMPLETION_GATE_KEY, lastCompletedDate: '2026-08-10', destinationOnly: true }],
+  [{ date: COMPLETION_GATE_KEY, lastCompletedDate: '2026-08-12', legacyOnly: true }],
+)
+const mergedCompletionGate = completionMerge.records.find((record) => record.date === COMPLETION_GATE_KEY)
+assert.equal(mergedCompletionGate.lastCompletedDate, '2026-08-12')
+assert.equal(mergedCompletionGate.destinationOnly, true)
+assert.equal(mergedCompletionGate.legacyOnly, true)
+
+const filmMerge = mergeStorageRecords(
+  [{ date: FILM_COLLECTION_KEY, unlockedFilmIds: ['classic-white', 'sky-blue'], selectedFilmId: 'sky-blue' }],
+  [{ date: FILM_COLLECTION_KEY, unlockedFilmIds: ['classic-white', 'sweet-pink'], selectedFilmId: 'sweet-pink' }],
+)
+const mergedFilmCollection = filmMerge.records.find((record) => record.date === FILM_COLLECTION_KEY)
+assert.deepEqual(mergedFilmCollection.unlockedFilmIds, ['classic-white', 'sweet-pink', 'sky-blue'])
+assert.equal(mergedFilmCollection.selectedFilmId, 'sky-blue')
+
+const emptyDestinationDraft = { date: ACTIVE_DRAFT_KEY, photos: {}, samples: {}, completedAt: null }
+const legacyDraft = { date: ACTIVE_DRAFT_KEY, photos: { violet: 'legacy-photo' }, samples: { violet: '#aa44cc' }, completedAt: null }
+const importedDraftMerge = mergeStorageRecords([emptyDestinationDraft], [legacyDraft])
+assert.equal(importedDraftMerge.mergedRecords, 1)
+assert.deepEqual(importedDraftMerge.records.find((record) => record.date === ACTIVE_DRAFT_KEY).photos, legacyDraft.photos)
+
+const destinationDraft = { date: ACTIVE_DRAFT_KEY, photos: { red: 'destination-photo' }, samples: { red: '#ff0000' }, completedAt: null }
+const preservedDraftMerge = mergeStorageRecords([destinationDraft], [legacyDraft])
+assert.equal(preservedDraftMerge.skippedRecords, 1)
+assert.equal(preservedDraftMerge.records.find((record) => record.date === ACTIVE_DRAFT_KEY), destinationDraft)
+
+const validSnapshot = validateStorageSnapshot({
+  schemaVersion: STORAGE_SNAPSHOT_SCHEMA_VERSION,
+  indexedDB: { records: [importedRecord] },
+  localStorage: [{ key: 'niji-language', value: 'zh-Hant' }],
+})
+assert.deepEqual(validSnapshot.indexedDB.records, [importedRecord])
+assert.throws(() => validateStorageSnapshot({ schemaVersion: STORAGE_SNAPSHOT_SCHEMA_VERSION, indexedDB: { records: [{ date: '' }] } }), /invalid/i)
+assert.throws(() => validateStorageSnapshot({ schemaVersion: 999, indexedDB: { records: [] } }), /unsupported/i)
 
 console.log("Storage model: drafts migrate safely, completed days keep only the final Polaroid image, and daily completion remains locked.")

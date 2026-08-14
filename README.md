@@ -33,4 +33,8 @@ GitHub Actions 已設定兩種部署方式：
 
 API Token 不要寫入程式碼或 commit；Cloudflare 官方的 Direct Upload CI 流程也使用這兩個 GitHub Secrets。
 
+## 從舊 GitHub Pages 搬移資料
+
+舊站 `https://maxzh1999tw.github.io/niji-diary/` 的設定頁提供「帶到新正式站」按鈕。按下後會開啟 [niji.mia-and-max.com](https://niji.mia-and-max.com)，再以受限來源的 `postMessage` 將舊站本機資料傳給新站；新站只新增尚未存在的 IndexedDB 與 localStorage 資料，不會刪除或覆蓋舊站資料。搬移前請允許瀏覽器開啟新視窗，且新正式站必須已部署包含接收橋接的版本。
+
 創作中的照片會暫存在瀏覽器本機；拍立得完成後，系統只在 IndexedDB 保存底片已定稿的壓縮成品圖、可編輯文字、日期、完成時間與解鎖中繼資料，並刪除填色紀錄、來源照片與合成中間資料。資料不會上傳到伺服器，清除網站資料或更換瀏覽器／裝置後也不會自動同步。
