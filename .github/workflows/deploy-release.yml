@@ -45,7 +45,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4'
-          command: pages deploy docs --project-name=niji-diary
+          command: pages deploy docs --project-name=niji-diary --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy test preview

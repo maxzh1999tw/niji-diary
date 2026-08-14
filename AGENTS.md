@@ -51,6 +51,6 @@
 
 ### 部署維護注意事項
 
-- Wrangler 部署指令為 `pages deploy docs --project-name=niji-diary`；測試站額外加上 `--branch=test`。
+- Wrangler 正式部署指令為 `pages deploy docs --project-name=niji-diary --branch=main`；測試站額外加上 `--branch=test`。release tag checkout 可能是 detached HEAD，因此正式部署必須明確指定 production branch。
 - 修改部署流程後，至少確認 `npm test`、`npm run build`，並手動執行測試站 workflow。
 - 部署完成後確認正式站與測試站皆可正常回應，且不可清除或覆寫使用者既有資料。
