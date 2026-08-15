@@ -18,8 +18,8 @@
       .skip:focus { transform: none; }
       main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: clamp(64px, 10vw, 112px) 0 56px; }
       .eyebrow { margin: 0 0 12px; color: var(--blue); font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-      h1 { max-width: 720px; margin: 0; font-size: clamp(44px, 10vw, 88px); line-height: .95; letter-spacing: -.055em; }
-      .intro { max-width: 640px; margin: 24px 0 0; color: #334155; font-size: clamp(18px, 3vw, 22px); line-height: 1.65; }
+      h1 { margin: 0; font-size: clamp(32px, 9vw, 88px); line-height: .95; letter-spacing: -.055em; text-wrap: balance; }
+      .intro { margin: 24px 0 0; color: #334155; font-size: clamp(18px, 3vw, 22px); line-height: 1.65; text-wrap: pretty; }
       .projects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: clamp(48px, 8vw, 76px); }
       .card { min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(24px, 4vw, 36px); border: 3px solid #0f172a; border-radius: 28px; background: #fff; box-shadow: 8px 8px 0 #0f172a; text-decoration: none; transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease; }
       .card:hover { transform: translate(-3px, -3px); box-shadow: 12px 12px 0 #0f172a; }
@@ -27,8 +27,8 @@
       .card.niji { background: #fce7f3; }
       .card.wedding { background: #dcfce7; }
       .card-label { font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-      .card h2 { margin: 24px 0 8px; font-size: clamp(28px, 5vw, 40px); line-height: 1.1; }
-      .card p { margin: 0; color: #334155; font-size: 16px; line-height: 1.6; }
+      .card h2 { margin: 24px 0 8px; font-size: clamp(28px, 5vw, 40px); line-height: 1.1; text-wrap: balance; }
+      .card p { margin: 0; color: #334155; font-size: 16px; line-height: 1.6; text-wrap: pretty; }
       .visit { display: inline-flex; align-items: center; gap: 8px; margin-top: 28px; font-size: 15px; font-weight: 800; }
       .visit svg { width: 20px; height: 20px; }
       footer { margin-top: 56px; padding-top: 24px; border-top: 2px solid var(--border); color: #475569; font-size: 14px; line-height: 1.6; }

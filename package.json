@@ -8,7 +8,7 @@
     "build": "npm run icons && vite build",
     "icons": "node scripts/generate-icons.mjs",
     "preview": "vite preview",
-    "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs && node tests/storageModel.test.mjs && node tests/films.test.mjs && node tests/filmRendering.test.mjs && node tests/appRoutes.test.mjs && node tests/infoContent.test.mjs && node tests/adsense.test.mjs && node tests/rootSite.test.mjs"
+    "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs && node tests/storageModel.test.mjs && node tests/films.test.mjs && node tests/filmRendering.test.mjs && node tests/appRoutes.test.mjs && node tests/infoContent.test.mjs && node tests/adsense.test.mjs && node tests/rootSite.test.mjs && node tests/typography.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
