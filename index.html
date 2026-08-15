@@ -9,6 +9,46 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <style>
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: #fff9ff;
+      }
+
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 16px;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        background: #fff9ff;
+        color: #241435;
+        text-align: center;
+      }
+
+      .boot-splash-logo {
+        width: clamp(96px, 28vw, 132px);
+        height: clamp(96px, 28vw, 132px);
+        display: block;
+        object-fit: contain;
+      }
+
+      .boot-splash-label {
+        font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+        font-size: clamp(18px, 5vw, 22px);
+        font-weight: 700;
+        letter-spacing: .08em;
+        line-height: 1.3;
+      }
+    </style>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./logo.svg" type="image/svg+xml" />
     <link rel="icon" href="./icon-32.png" sizes="32x32" type="image/png" />
@@ -18,7 +58,12 @@
     <title>拾色日記 · Niji Diary</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-splash" role="status" aria-label="拾色日記">
+        <img class="boot-splash-logo" src="./logo.svg" alt="" aria-hidden="true" />
+        <span class="boot-splash-label">拾色日記</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

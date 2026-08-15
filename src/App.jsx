@@ -53,6 +53,13 @@ function Icon({ name, size = 24 }) {
   return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>
 }
 
+function BootSplash({ label }) {
+  return <div className="boot-splash" role="status" aria-live="polite" aria-label={label}>
+    <img className="boot-splash-logo" src="./logo.svg" alt="" aria-hidden="true" />
+    <span className="boot-splash-label">{label}</span>
+  </div>
+}
+
 function localDateKey() {
   const now = new Date()
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
@@ -1960,6 +1967,8 @@ export default function App() {
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged
+
+  if (loading && !day) return <BootSplash label={t.brand} />
 
   return <div className="app-environment">
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />
