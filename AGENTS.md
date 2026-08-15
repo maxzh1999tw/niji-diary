@@ -21,14 +21,20 @@
 
 - 全站可見文字的 CSS 計算字級不得小於 12px；包含手機版、徽章、輔助說明、按鈕、時間、預覽與狀態文字。
 - 新增或調整文字時優先使用 12px 以上；不得以縮小文字換取版面容納，應改用換行、間距或版面調整。
+- 可見文字與承載文字的欄位不得直接設定固定 `width`、`max-width`、`min-width` 或 `inline-size` 來控制行長或斷行；尺寸限制應放在外層版面容器，而不是文字本身。
+- 不得用 `white-space: nowrap`、`text-overflow: ellipsis`、`line-clamp` 或手動插入換行字元掩蓋版面問題。文字預設必須完整顯示並依可用空間自然換行。
+- 文字版面必須透過正規 RWD 手段自適應，包括彈性的 Grid／Flex 配置、`minmax(0, 1fr)`、適當斷點、容器 padding／gap 調整、欄位重排與 `overflow-wrap`；不得用縮字或裁切文字換取容納。
+- 無障礙專用的視覺隱藏文字可使用標準裁切寫法；非文字圖像、圖示、畫布與表單控制項本體可依版面需要設定尺寸，但其中的可見文字仍須遵守上述規則。
 
 ## Cloudflare Pages 部署資訊
 
-- Cloudflare Pages 專案：`niji-diary`
+- 本專案只有一個 Git Repo：`maxzh1999tw/niji-diary`。根網域沒有獨立 Repo；根站與 Niji 的程式碼、文件及部署設定都由本 Repo 版本控制。
+- 根網域靜態頁面位於 `root-site/`，直接部署至獨立的 Cloudflare Pages 專案 `mia-and-max-root`，正式站為 <https://mia-and-max.com>。
+- Niji 應用程式位於 Repo 根目錄，執行 `npm run build` 後輸出至 `docs/`，部署至另一個 Cloudflare Pages 專案 `niji-diary`，正式站為 <https://niji.mia-and-max.com>。
+- `mia-and-max-root` 與 `niji-diary` 是兩個獨立的 Cloudflare Pages 專案，但共用同一個 Git Repo；修改或部署其中一站時，不得誤認另一站有獨立的原始碼儲存庫。
 - Cloudflare 帳戶 ID：`10a8a3c91b60c03a4073bee79dccb28f`
 - 建置指令：`npm run build`
 - 建置輸出目錄：`docs/`
-- 正式站：<https://niji.mia-and-max.com>
 - 測試站：<https://test.niji-diary.pages.dev>
 - 測試部署使用 Pages 預覽分支 `test`；正式部署使用 Pages production deployment。
 
@@ -51,6 +57,7 @@
 
 ### 部署維護注意事項
 
+- 根網域正式部署指令為 `pages deploy root-site --project-name=mia-and-max-root --branch=main`。
 - Wrangler 正式部署指令為 `pages deploy docs --project-name=niji-diary --branch=main`；測試站額外加上 `--branch=test`。release tag checkout 可能是 detached HEAD，因此正式部署必須明確指定 production branch。
 - 修改部署流程後，至少確認 `npm test`、`npm run build`，並手動執行測試站 workflow。
 - 部署完成後確認正式站與測試站皆可正常回應，且不可清除或覆寫使用者既有資料。
