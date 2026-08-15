@@ -1,4 +1,4 @@
-const CACHE_NAME = 'niji-diary-shell-v6'
+const CACHE_NAME = 'niji-diary-shell-v7'
 const CACHE_PREFIX = 'niji-diary-shell-'
 const CACHE_TIMEOUT_MS = 3000
 
@@ -74,12 +74,16 @@ function fetchWithTimeout(request) {
 
 async function networkFirstNavigation(request) {
   const cache = await caches.open(CACHE_NAME)
+  const requestUrl = new URL(request.url)
+  const isAppShellNavigation = requestUrl.pathname === '/' || requestUrl.pathname === '/index.html'
 
   try {
     const response = await fetchWithTimeout(request)
     if (response?.ok) {
       await cache.put(request, response.clone())
-      await cache.put(appUrl('/index.html'), response.clone())
+      if (isAppShellNavigation) {
+        await cache.put(appUrl('/index.html'), response.clone())
+      }
       return response
     }
   } catch {

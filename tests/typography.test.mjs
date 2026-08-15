@@ -6,10 +6,11 @@ const [rootHtml, appStyles] = await Promise.all([
   readFile(new URL('../src/styles.css', import.meta.url), 'utf8'),
 ])
 
-assert.match(rootHtml, /<h1>我們的小小網路空間<\/h1>/)
+assert.match(rootHtml, /<h1 id="hero-title">用七種顏色，<span class="keep-phrase">顯影今天的彩虹<\/span><\/h1>/)
 assert.doesNotMatch(rootHtml, /title-phrase/)
 assert.doesNotMatch(rootHtml, /\.intro\s*\{[^}]*max-width:/)
 assert.match(rootHtml, /h1\s*\{[^}]*text-wrap:\s*balance/)
+assert.doesNotMatch(rootHtml, /\.hero-copy\s*\{[^}]*max-width:/)
 
 for (const selector of ['.mission-copy', '.capture-copy']) {
   const escapedSelector = selector.replace('.', '\\.')

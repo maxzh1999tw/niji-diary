@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="你的照片與日記留在裝置上；網站運作所需的技術連線則依本政策說明。" />
+    <meta name="google-adsense-account" content="ca-pub-9186241112756787" />
+    <meta name="theme-color" content="#fff9ff" />
+    <meta property="og:title" content="隱私權政策｜拾色日記" />
+    <meta property="og:description" content="你的照片與日記留在裝置上；網站運作所需的技術連線則依本政策說明。" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://niji.mia-and-max.com/info/privacy/" />
+    <link rel="canonical" href="https://niji.mia-and-max.com/info/privacy/" />
+    <link rel="icon" href="../../logo.svg" type="image/svg+xml" />
+    <title>隱私權政策｜拾色日記 · Niji Diary</title>
+    <style>
+      :root { color-scheme: light; font-family: "Trebuchet MS", "Noto Sans TC", system-ui, sans-serif; color: #241435; background: #fff9ff; --ink: #241435; --pink: #ff4fa3; --cyan: #4ee8f5; --yellow: #ffd84d; --lime: #c9f65b; }
+      * { box-sizing: border-box; }
+      body { min-width: 320px; min-height: 100dvh; margin: 0; background: radial-gradient(circle at 8% 6%, #ffd8eb 0 8%, transparent 8.5%), radial-gradient(circle at 92% 30%, #d9fbff 0 10%, transparent 10.5%), #fff9ff; }
+      a { color: inherit; } a:focus-visible { outline: 4px solid #6d40cc; outline-offset: 4px; }
+      .skip { position: fixed; top: 12px; left: 12px; z-index: 10; padding: 11px 15px; border: 2px solid var(--ink); border-radius: 11px; background: white; font-size: 14px; font-weight: 900; transform: translateY(-170%); }.skip:focus { transform: none; }
+      .site-header, main, footer { width: min(900px, calc(100% - 32px)); margin-inline: auto; }
+      .site-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 0; }
+      .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 900; text-decoration: none; }.brand img { width: 40px; height: 40px; }
+      .play-link { min-height: 44px; display: inline-flex; align-items: center; padding: 9px 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--pink); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 900; text-decoration: none; }
+      main { padding: 30px 0 60px; }
+      .hero { padding: clamp(26px, 6vw, 52px); border: 3px solid var(--ink); border-radius: 24px 24px 0 0; background: linear-gradient(130deg, #fff0fa, #d9fbff 58%, #f2ffd3); }
+      .kicker { margin: 0 0 12px; color: #7037c7; font-size: 13px; font-weight: 900; letter-spacing: .13em; }.hero h1 { margin: 0; font-size: clamp(34px, 7vw, 54px); line-height: 1.08; letter-spacing: -.035em; text-wrap: balance; }.summary { margin: 17px 0 0; color: #4f3a60; font-size: 17px; font-weight: 700; line-height: 1.7; text-wrap: pretty; }.status { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 7px 11px; border: 2px solid var(--ink); border-radius: 999px; background: white; font-size: 13px; font-weight: 900; }.status::before { content: ""; width: 10px; height: 10px; border: 2px solid var(--ink); border-radius: 50%; background: var(--lime); }.updated { display: block; margin-top: 14px; color: #5b4968; font-size: 12px; font-weight: 800; }
+      .article-body { padding: clamp(24px, 6vw, 52px); border: 3px solid var(--ink); border-top: 0; border-radius: 0 0 24px 24px; background: white; box-shadow: 8px 8px 0 var(--ink); }.article-body section + section { margin-top: 34px; padding-top: 30px; border-top: 2px dashed #cdbfda; }.article-body h2 { margin: 0 0 12px; font-size: 23px; line-height: 1.25; text-wrap: balance; }.article-body p, .article-body li { color: #463754; font-size: 16px; font-weight: 600; line-height: 1.75; text-wrap: pretty; }.article-body p { margin: 0; }.article-body p + p { margin-top: 12px; }.article-body ul { margin: 0; padding-left: 24px; }.article-body li + li { margin-top: 8px; }.article-body li::marker { color: #7037c7; }
+      .resources { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }.resources a { min-height: 44px; display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 2px solid var(--ink); border-radius: 12px; background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 900; text-decoration: none; }
+      .page-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 28px; }.page-nav a { min-height: 50px; display: flex; align-items: center; justify-content: center; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 12px; background: white; box-shadow: 3px 3px 0 var(--ink); font-size: 12px; font-weight: 900; line-height: 1.35; text-align: center; text-decoration: none; }.page-nav a[aria-current="page"] { background: var(--cyan); }
+      footer { padding: 28px 0 44px; border-top: 2px solid #cdbfda; color: #5b4968; font-size: 13px; line-height: 1.6; }
+      @media (max-width: 620px) { .site-header, main, footer { width: min(100% - 24px, 900px); }.site-header { align-items: flex-start; }.hero { border-radius: 19px 19px 0 0; }.article-body { border-radius: 0 0 19px 19px; box-shadow: 5px 5px 0 var(--ink); }.page-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }.page-nav a { justify-content: flex-start; text-align: left; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">跳到主要內容</a>
+    <header class="site-header"><a class="brand" href="../../"><img src="../../logo.svg" alt="" aria-hidden="true" />拾色日記</a><a class="play-link" href="../../#today">開始拾色</a></header>
+    <main id="content">
+      <article>
+        <header class="hero"><p class="kicker">PRIVACY</p><h1>隱私權政策</h1><p class="summary">你的照片與日記留在裝置上；網站運作所需的技術連線則依本政策說明。</p><small class="updated">生效與更新日期：2026 年 8 月 15 日</small></header>
+        <div class="article-body"><section><h2>我們處理哪些資料</h2><p>拾色日記本身不要求姓名、電子郵件或帳號。你建立的照片、取色結果、文字、日期、完成狀態、底片設定與語言偏好，會由瀏覽器保存在這台裝置。</p></section><section><h2>本機儲存與保留期間</h2><p>內容透過 IndexedDB、localStorage、Cache Storage 與 Service Worker 保存在瀏覽器中，直到你在應用程式內刪除、清除網站資料，或瀏覽器／作業系統自行移除。拾色日記營運者無法讀取、代為復原或遠端刪除這些本機內容。</p></section><section><h2>網路與第三方服務</h2><p>網站由 Cloudflare Pages 提供。連線時，Cloudflare 可能處理 IP 位址、路由、系統設定與流量等安全及傳輸資料。頁面也會向 Google Fonts 請求字型，Google 可能收到 IP 位址、瀏覽器資訊與請求頁面等技術資料。</p><div class="resources" aria-label="相關連結"><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noreferrer">Cloudflare 隱私權政策<span aria-hidden="true">↗</span></a><a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noreferrer">Google 如何使用合作夥伴網站資料<span aria-hidden="true">↗</span></a></div></section><section><h2>分享、下載與舊站搬移</h2><p>只有在你主動操作時，拍立得才會交給瀏覽器或作業系統下載、或送至你選擇的分享目標。舊站搬移也只在你按下搬移按鈕後，透過兩個站點視窗間的訊息傳送；內容不會先送到拾色日記伺服器。</p></section><section><h2>廣告與分析</h2><p>目前沒有啟用 Google 廣告或分析追蹤。若日後加入，會先更新本政策與「廣告與 Cookie 說明」，並依適用地區提供必要的選擇或同意機制。廣告服務不應取得你的照片、取色結果或日記文字。</p></section><section><h2>你的選擇與權利</h2><p>你可以刪除單筆紀錄、清除全部網站資料、封鎖第三方 Cookie，或透過聯絡頁反映政策問題。涉及可識別個人資料時，將依適用法律處理查詢、更正、停止利用或刪除等請求。</p><div class="resources" aria-label="相關連結"><a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?PCode=I0050021" target="_blank" rel="noreferrer">個人資料保護法<span aria-hidden="true">↗</span></a></div></section><section><h2>兒少使用</h2><p>未成年人請在法定代理人或監護人了解並同意後使用，也請避免在公開分享時揭露可辨識個人、學校、住址或即時位置的資訊。</p></section></div>
+      </article>
+      <nav class="page-nav" aria-label="網站資訊"><a href="../about/">關於拾色日記</a><a href="../guide/">使用方法／常見問題</a><a href="../privacy/" aria-current="page">隱私權政策</a><a href="../terms/">使用條款</a><a href="../contact/">聯絡方式</a><a href="../ads/">廣告與 Cookie 說明</a></nav>
+    </main>
+    <footer>© 2026 Mia & Max · <a href="https://mia-and-max.com/">回到 Mia & Max</a></footer>
+  </body>
+</html>
