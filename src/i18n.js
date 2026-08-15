@@ -2,8 +2,8 @@ export const translations = {
   'zh-Hant': {
     brand: '拾色日記', mainNavigation: '主要導覽', skip: '跳至主要內容',
     tabs: { today: '拍立得', archive: '相冊', films: '底片', settings: '設定' },
-    todayMission: '今天的拾色任務', missionComplete: '任務完成！', colorsLeft: '還差 {count} 色', questCleared: 'QUEST CLEARED', questGuideTitle: '玩法', questSteps: [{ title: '拍照', text: '拍下今天喜歡的顏色' }, { title: '取色', text: '從照片選一個彩虹色格' }, { title: '完成', text: '集滿七色，製作拍立得' }],
-    findTheRainbow: '收集路上的顏色拼成彩虹', rainbowReady: '今天的彩虹已封存', photoFirstHint: '先拍下眼前的顏色或選擇圖片，再決定它屬於彩虹哪一格。', comeBackTomorrow: '明天再一起解鎖新的七色任務。',
+    todayMission: '今天的拾色任務', missionComplete: '任務完成！', colorsLeft: '還差 {count} 色', questCleared: 'QUEST CLEARED',
+    findTheRainbow: '蒐集路上的顏色\n拼成彩虹', rainbowReady: '今天的彩虹已封存', photoFirstHint: '收集路上的七種顏色，合成屬於你的彩虹。', questNote: '每天只能產生一張拍立得，所以要用心製作喔。', comeBackTomorrow: '明天再一起解鎖新的七色任務。',
     colorSlots: '彩虹能量槽', foundCount: '已收集 {count}/7', allFound: '七色到齊', tapToRemove: '色格顯示取樣色；點選可以移除', takePhoto: '拍一張照片', uploadPhoto: '上傳圖片', thenPickColor: '拍完再取色、用輪盤分類',
     completeRainbow: '封存今天的彩虹', createRainbowCard: '進入彩虹工作室', todayLocked: '今日任務已鎖定',
     whichColor: '這張照片，是哪一道光？', wheelHint: 'AI 已經先猜好了。轉念也沒關係，你可以任意選一色。', aiGuess: '智慧感知 · 信心 {confidence}%', cancel: '返回', newPhotoAlt: '等待分類的照片',
@@ -20,8 +20,8 @@ export const translations = {
   en: {
     brand: 'Niji Diary', mainNavigation: 'Main navigation', skip: 'Skip to main content',
     tabs: { today: 'Quest', archive: 'Album', films: 'Films', settings: 'Settings' },
-    todayMission: "Today's color quest", missionComplete: 'Quest complete!', colorsLeft: '{count} colors left', questCleared: 'QUEST CLEARED', questGuideTitle: 'How it works', questSteps: [{ title: 'Capture', text: 'Take a photo of a color you like' }, { title: 'Pick', text: 'Choose one color from the photo' }, { title: 'Develop', text: 'Collect seven colors and make a card' }],
-    findTheRainbow: 'Turn colors you love into a rainbow', rainbowReady: "Today's rainbow is saved", photoFirstHint: 'Take a photo or choose an image, then decide where it belongs in your rainbow.', comeBackTomorrow: 'Come back tomorrow to unlock seven new colors.',
+    todayMission: "Today's color quest", missionComplete: 'Quest complete!', colorsLeft: '{count} colors left', questCleared: 'QUEST CLEARED',
+    findTheRainbow: 'Collect colors from your day\ninto a rainbow', rainbowReady: "Today's rainbow is saved", photoFirstHint: 'Collect seven colors from your day and combine them into your rainbow.', questNote: 'You can make only one Polaroid each day, so make it with care.', comeBackTomorrow: 'Come back tomorrow to unlock seven new colors.',
     colorSlots: 'Rainbow energy', foundCount: '{count}/7 collected', allFound: 'All colors found', tapToRemove: 'Slots show sampled colors; tap one to remove it', takePhoto: 'Take a photo', uploadPhoto: 'Upload', thenPickColor: 'Then sample and classify it',
     completeRainbow: "Save today's rainbow", createRainbowCard: 'Enter Rainbow Studio', todayLocked: "Today's quest is locked",
     whichColor: 'Which ray of light is this?', wheelHint: 'AI made the first guess. You are always free to choose any color.', aiGuess: 'Smart sensing · {confidence}% confidence', cancel: 'Back', newPhotoAlt: 'New photo waiting to be classified',
@@ -38,8 +38,8 @@ export const translations = {
   ja: {
     brand: '虹いろ日記', mainNavigation: 'メインナビゲーション', skip: 'メインへ移動',
     tabs: { today: '今日のクエスト', archive: 'アルバム', films: 'フィルム', settings: '設定' },
-    todayMission: '今日の色ひろい', missionComplete: 'クエスト完了！', colorsLeft: 'あと {count} 色', questCleared: 'QUEST CLEARED', questGuideTitle: '遊び方', questSteps: [{ title: '撮る', text: '好きな色を写真に残す' }, { title: '採る', text: '写真から虹の色をひとつ選ぶ' }, { title: '完成', text: '七色集めてカードを作る' }],
-    findTheRainbow: '好きな色を、ひとつの虹に', rainbowReady: '今日の虹を保存しました', photoFirstHint: '写真を撮るか画像を選んで、虹のどこに入れるか決めよう。', comeBackTomorrow: '明日また、新しい七色を探そう。',
+    todayMission: '今日の色ひろい', missionComplete: 'クエスト完了！', colorsLeft: 'あと {count} 色', questCleared: 'QUEST CLEARED',
+    findTheRainbow: '今日の色を集めて\nひとつの虹に', rainbowReady: '今日の虹を保存しました', photoFirstHint: '今日の七色を集めて、あなたの虹に仕上げよう。', questNote: 'ポラロイドは1日1枚。心をこめて作ろう。', comeBackTomorrow: '明日また、新しい七色を探そう。',
     colorSlots: '虹エネルギー', foundCount: '{count}/7 集めた', allFound: '七色コンプリート', tapToRemove: 'スロットは採取した色を表示。タップで削除', takePhoto: '写真を撮る', uploadPhoto: '画像を選ぶ', thenPickColor: '撮ったあと、色を採取して分類',
     completeRainbow: '今日の虹を保存', createRainbowCard: '虹スタジオへ', todayLocked: '今日のクエストはロック済み',
     whichColor: 'この写真は、どの光？', wheelHint: 'AIが先に予想しました。もちろん、好きな色を自由に選べます。', aiGuess: 'スマート感知 · 信頼度 {confidence}%', cancel: '戻る', newPhotoAlt: '色を選ぶ前の新しい写真',

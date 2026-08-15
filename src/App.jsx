@@ -813,15 +813,12 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
         <div className="mission-heading-copy"><time className="mission-date" dateTime={date}>{formatDate(date, lang)}</time><h1 id="today-title">{isComplete ? t.missionComplete : t.todayMission}</h1></div>
       </div>
       <div className={`mission-card ${isComplete ? 'is-complete' : ''}`}>
-        <div className="mission-card-content">
-          <div className="mission-card-heading"><span className="quest-kicker">DAILY QUEST</span><span className="quest-guide-label">{isComplete ? t.questCleared : t.questGuideTitle}</span></div>
-          <div className="mission-copy">
-            <h2>{isComplete ? t.rainbowReady : t.findTheRainbow}</h2>
-            <p>{isComplete ? t.comeBackTomorrow : t.photoFirstHint}</p>
-          </div>
-          {!isComplete ? <ol className="quest-steps" aria-label={t.questGuideTitle}>
-            {t.questSteps.map((step, index) => <li key={`${index}-${step.title}`}><span className="quest-step-number">{index + 1}</span><span className="quest-step-copy"><strong>{step.title}</strong><small>{step.text}</small></span></li>)}
-          </ol> : null}
+        <div className="rainbow-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <div className="mission-copy">
+          <span>{isComplete ? t.questCleared : formatText(t.colorsLeft, { count: 7 - count })}</span>
+          <h2>{isComplete ? t.rainbowReady : t.findTheRainbow}</h2>
+          <p>{isComplete ? t.comeBackTomorrow : t.photoFirstHint}</p>
+          {!isComplete ? <small className="mission-note">{t.questNote}</small> : null}
         </div>
       </div>
 

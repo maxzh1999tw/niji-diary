@@ -76,17 +76,12 @@ img { max-width: 100%; }
 .mission-date { display: block; margin-bottom: 5px; color: var(--ink); font: 700 clamp(20px, 3vw, 28px)/1.15 'Fredoka', 'Noto Sans TC', sans-serif; letter-spacing: .01em; }
 .micro-label, .chrome-kicker { display: block; margin-bottom: 4px; font-family: 'Fredoka', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: var(--purple); text-transform: uppercase; }
 .mission-head h1, .screen-title h1, .capture-copy h1 { margin: 0; font-family: 'Fredoka', 'Noto Sans TC', sans-serif; font-size: clamp(26px, 4vw, 40px); line-height: 1.05; text-wrap: balance; }
-.mission-card { position: relative; overflow: hidden; padding: 24px clamp(20px, 3vw, 32px); border: var(--border); border-radius: 24px; background: white; box-shadow: 7px 7px 0 var(--ink); }
-.mission-card.is-complete { background: var(--lime); }
-.mission-card-content { min-width: 0; }
-.mission-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.quest-kicker { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--yellow); color: var(--ink); font: 700 12px/1 'Fredoka', sans-serif; letter-spacing: .12em; }
-.quest-guide-label { color: var(--ink-soft); font-size: 12px; font-weight: 800; text-align: right; }
-.mission-copy { min-width: 0; }.mission-copy h2 { margin: 0 0 8px; font: 700 clamp(23px, 3.4vw, 36px)/1.1 'Fredoka', 'Noto Sans TC', sans-serif; text-wrap: balance; }.mission-copy p { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.5; text-wrap: pretty; }
-.quest-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 22px 0 0; padding: 0; list-style: none; }
-.quest-steps li { min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 2px solid #e1d9eb; border-radius: 16px; background: var(--surface-alt); }
-.quest-step-number { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: 50%; background: var(--cyan); font: 800 14px/1 'Fredoka', sans-serif; }
-.quest-step-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }.quest-step-copy strong { font: 800 14px/1.15 'Fredoka', 'Noto Sans TC', sans-serif; }.quest-step-copy small { color: var(--ink-soft); font-size: 12px; font-weight: 700; line-height: 1.35; }
+.mission-card { position: relative; min-height: 190px; display: flex; align-items: center; overflow: hidden; padding: 28px clamp(190px, 27vw, 300px) 28px 28px; border: var(--border); border-radius: 24px; background: linear-gradient(120deg, #ff7cca, #ffb7e2 45%, #8eeff2); box-shadow: 7px 7px 0 var(--ink); }
+.mission-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, rgba(255,255,255,.72), transparent 20%, transparent 65%, rgba(255,255,255,.5) 67%, transparent 72%); }
+.mission-card.is-complete { background: linear-gradient(120deg, var(--lime), #fff4a6 55%, var(--cyan)); }
+.mission-copy { position: relative; z-index: 2; min-width: 0; flex: 1; }.mission-copy > span { display: inline-block; margin-bottom: 8px; padding: 5px 9px; border: 2px solid var(--ink); background: white; font-size: 12px; font-weight: 800; transform: rotate(-1deg); }.mission-copy h2 { margin: 0 0 8px; font: 700 clamp(23px, 3.4vw, 36px)/1.1 'Fredoka', 'Noto Sans TC', sans-serif; text-wrap: balance; white-space: pre-line; }.mission-copy p { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.5; text-wrap: pretty; }
+.mission-note { display: block; margin-top: 10px; color: var(--ink-soft); font-size: 12px; font-weight: 700; line-height: 1.4; }
+.rainbow-orbit { position: absolute; right: -34px; bottom: -74px; width: 290px; height: 290px; border: 30px solid var(--pink); border-radius: 50%; box-shadow: inset 0 0 0 28px var(--yellow), inset 0 0 0 56px var(--cyan); transform: rotate(-16deg); }.rainbow-orbit i { position: absolute; border-radius: 50%; background: white; border: 2px solid var(--ink); }.rainbow-orbit i:nth-child(1) { width: 21px; height: 21px; top: 42px; left: 26px; }.rainbow-orbit i:nth-child(2) { width: 12px; height: 12px; top: 17px; left: 70px; }.rainbow-orbit i:nth-child(3) { width: 9px; height: 9px; top: 54px; left: 86px; }
 
 .collection-panel { margin-top: 24px; padding: 18px 20px 14px; border: var(--border); border-radius: 20px; background: white; box-shadow: 5px 5px 0 #c5b4ec; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }.panel-title h2 { margin: 0; font: 700 18px/1 'Fredoka', 'Noto Sans TC', sans-serif; }.panel-title span { font-size: 12px; font-weight: 800; color: var(--purple); }
@@ -218,7 +213,7 @@ img { max-width: 100%; }
   .app-header { padding: calc(7px + env(safe-area-inset-top)) 16px 7px; }.app-logo { min-height: 49px; }.app-brand-mark { width: 49px; height: 49px; }.app-logo b { font-size: 19px; }
   .bottom-nav { gap: 5px; padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); }.bottom-nav button { min-height: 58px; flex-direction: column; gap: 2px; border-radius: 13px; font-size: 12px; }.bottom-nav button.active::before { display: none; }
   .today-screen { padding: 20px 16px 26px; }.mission-head { margin-bottom: 16px; }.mission-date { font-size: 20px; }.mission-head h1 { font-size: 27px; }
-  .mission-card { padding: 20px; border-radius: 20px; box-shadow: 5px 5px 0 var(--ink); }.mission-card-heading { margin-bottom: 14px; }.mission-copy h2 { font-size: 23px; }.mission-copy p { font-size: 13px; line-height: 1.4; }.quest-steps { gap: 8px; margin-top: 18px; }.quest-steps li { flex-direction: column; gap: 7px; padding: 10px; }.quest-step-copy strong { font-size: 13px; }
+  .mission-card { min-height: 176px; padding: 24px 118px 24px 20px; border-radius: 20px; box-shadow: 5px 5px 0 var(--ink); }.rainbow-orbit { right: -118px; bottom: -84px; }.mission-copy h2 { font-size: 23px; }.mission-copy p { font-size: 13px; line-height: 1.4; }.mission-note { font-size: 12px; }
   .collection-panel { margin-top: 20px; padding: 15px 12px 12px; }.rainbow-strip { gap: 4px; }.rainbow-strip > * { height: 60px; border-radius: 9px; box-shadow: 1px 1px 0 var(--ink); }.rainbow-strip span { width: 23px; height: 23px; font-size: 12px; }
   .primary-zone { margin-top: 21px; }.capture-button { width: 100%; min-width: 0; }.locked-message { width: 100%; }
   .capture-stage { padding: 16px 16px 26px; }.back-button { position: static; width: 44px; height: 44px; margin-bottom: -42px; }.capture-copy { padding: 0 38px; margin-bottom: 14px; }.capture-copy h1 { font-size: 25px; }.capture-copy p { display: none; }.ai-badge { font-size: 12px; }
@@ -236,19 +231,19 @@ img { max-width: 100%; }
 }
 
 @media (max-width: 380px) {
-  .mission-card { padding: 18px 16px; }.mission-card-heading { gap: 8px; }.mission-copy h2 { font-size: 20px; }.mission-copy p { font-size: 12px; }.quest-guide-label { font-size: 12px; }.collection-panel { margin-top: 16px; }.primary-zone { margin-top: 17px; }
+  .mission-card { min-height: 158px; padding-top: 20px; padding-bottom: 20px; }.mission-copy h2 { font-size: 20px; }.mission-copy p { font-size: 12px; }.mission-note { font-size: 12px; }.collection-panel { margin-top: 16px; }.primary-zone { margin-top: 17px; }
   .capture-copy h1 { font-size: 22px; }.capture-layout { grid-template-columns: 92px minmax(0, 245px); }.color-wheel { width: 245px; }.wheel-choice { width: 44px; height: 44px; }
 }
 
 @media (max-height: 690px) and (max-width: 760px) {
-  .today-screen { padding-top: 12px; }.mission-head { margin-bottom: 10px; }.mission-card { padding: 16px; }.mission-copy h2 { font-size: 20px; }.mission-copy p { font-size: 12px; }.quest-steps { margin-top: 14px; }.collection-panel { margin-top: 12px; padding-top: 11px; }.rainbow-strip > * { height: 48px; }.primary-zone { margin-top: 12px; }
+  .today-screen { padding-top: 12px; }.mission-head { margin-bottom: 10px; }.mission-card { min-height: 135px; }.mission-copy h2 { font-size: 20px; }.mission-copy p { font-size: 12px; line-height: 1.35; }.mission-note { font-size: 12px; }.collection-panel { margin-top: 12px; padding-top: 11px; }.rainbow-strip > * { height: 48px; }.primary-zone { margin-top: 12px; }
   .capture-stage { padding-top: 9px; }.capture-copy { margin-bottom: 6px; }.capture-copy h1 { font-size: 21px; }.capture-layout { grid-template-columns: 88px minmax(0, 225px); }.color-wheel { width: 225px; }.wheel-choice { width: 44px; height: 44px; }.stage-actions { margin-top: 4px; }.y2k-button { min-height: 52px; }
   .studio-topbar { min-height: calc(52px + env(safe-area-inset-top)); }.canvas-stage { padding-top: 8px; padding-bottom: 8px; }.editor-dock { padding-top: 6px; }.active-editor-control { margin-bottom: 3px; }.editor-toolbar button { min-height: 44px; }
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
   .app-shell { grid-template-rows: 56px minmax(0,1fr) 66px; }.app-header { padding-top: 4px; padding-bottom: 4px; }.app-brand-mark { width: 44px; height: 44px; }.bottom-nav button { min-height: 48px; flex-direction: row; font-size: 12px; }
-  .today-screen { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; padding-top: 12px; }.mission-head { grid-column: 1 / -1; margin: 0; }.mission-card { padding: 18px; }.collection-panel { margin: 0; }.primary-zone { grid-column: 1 / -1; margin: 0; }.capture-layout { grid-template-columns: 130px 280px; }.capture-copy p { display: none; }.color-wheel { width: 260px; }.stage-actions { margin-top: 4px; }
+  .today-screen { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; padding-top: 12px; }.mission-head { grid-column: 1 / -1; margin: 0; }.mission-card { min-height: 150px; }.collection-panel { margin: 0; }.primary-zone { grid-column: 1 / -1; margin: 0; }.capture-layout { grid-template-columns: 130px 280px; }.capture-copy p { display: none; }.color-wheel { width: 260px; }.stage-actions { margin-top: 4px; }
   .studio-workspace { grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr); }.editor-dock { border-top: 0; border-left: 3px solid var(--ink); box-shadow: -5px 0 0 rgba(255,79,186,.35); }.editor-toolbar { grid-template-columns: repeat(2, 1fr); }.editor-toolbar .toolbar-reset { grid-column: 1 / -1; }.composition-canvas { max-height: 100%; }
 }
 
