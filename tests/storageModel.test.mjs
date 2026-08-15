@@ -51,7 +51,7 @@ const completedRecord = createCompletedDayRecord({
   filmId: 'pink-pop',
   caption: '完成品',
   captionInk: '#f8f5ea',
-  achievements: { filmChallenges: { version: 1, customCaption: true, daypart: 'evening' } },
+  achievements: { filmChallenges: { version: 1, customCaption: true, expandedRadius: true, boldColorBands: false, daypart: 'evening' } },
   futureMetadata: { preserved: true },
 }, 'complete-polaroid')
 assert.equal(completedRecord.schemaVersion, COMPLETED_DAY_SCHEMA_VERSION)
@@ -60,7 +60,7 @@ assert.equal(completedRecord.caption, '完成品')
 assert.equal(completedRecord.date, '2026-08-12')
 assert.equal(completedRecord.completedAt, '2026-08-12T12:00:00.000Z')
 assert.equal(completedRecord.captionInk, '#f8f5ea')
-assert.deepEqual(completedRecord.achievements.filmChallenges, { version: 1, customCaption: true, daypart: 'evening' })
+assert.deepEqual(completedRecord.achievements.filmChallenges, { version: 1, customCaption: true, expandedRadius: true, boldColorBands: false, daypart: 'evening' })
 assert.deepEqual(completedRecord.futureMetadata, { preserved: true })
 assert.equal('photos' in completedRecord, false)
 assert.equal('samples' in completedRecord, false)

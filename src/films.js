@@ -5,14 +5,11 @@ export const FILM_COLLECTION_SCHEMA_VERSION = 1
 export const FILM_CHALLENGE_VERSION = 1
 
 export const FILM_CHALLENGE_RULES = Object.freeze({
-  customCaptionCharacters: 6,
   mistTransparency: 0.55,
   compactArcDegrees: 60,
-  eclipseDarkLightness: 0.38,
-  eclipseBrightLightness: 0.82,
+  expandedRadius: 1.5,
+  boldColorBands: 1.5,
 })
-
-const FILM_DAYPARTS = new Set(['morning', 'day', 'evening', 'night'])
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const DAY_IN_MS = 86_400_000
@@ -112,6 +109,7 @@ export const FILMS = [
     className: 'film-letterpress-ochre',
     nameKey: 'filmLetterpressName',
     conditionKey: 'filmLetterpressCondition',
+    challengeTool: 'caption',
     unlock: { type: 'achievement', achievement: 'customCaption', target: 1 },
     paper: { top: '#fff9e8', middle: '#ead7b3', bottom: '#d7b081', accent: '#24324a' },
     ink: { primary: '#24324a', secondary: '#354159' },
@@ -131,6 +129,7 @@ export const FILMS = [
     className: 'film-vellum-mist',
     nameKey: 'filmVellumName',
     conditionKey: 'filmVellumCondition',
+    challengeTool: 'transparency',
     unlock: { type: 'achievement', achievement: 'mistTransparency', target: 1 },
     paper: { top: '#fcfbf7', middle: '#e8e3f2', bottom: '#d9edea', accent: '#73689b' },
     ink: { primary: '#322a46', secondary: '#554f6b' },
@@ -150,6 +149,7 @@ export const FILMS = [
     className: 'film-comet-orange',
     nameKey: 'filmCometName',
     conditionKey: 'filmCometCondition',
+    challengeTool: 'angle',
     unlock: { type: 'achievement', achievement: 'compactArc', target: 1 },
     paper: { top: '#fff2d2', middle: '#efa257', bottom: '#d47752', accent: '#3a2845' },
     ink: { primary: '#251b2e', secondary: '#251b2e' },
@@ -170,7 +170,8 @@ export const FILMS = [
     className: 'film-eclipse-silver',
     nameKey: 'filmEclipseName',
     conditionKey: 'filmEclipseCondition',
-    unlock: { type: 'achievement', achievement: 'eclipseContrast', target: 1 },
+    challengeTool: 'radius',
+    unlock: { type: 'achievement', achievement: 'expandedRadius', target: 1 },
     paper: { top: '#171923', middle: '#24283b', bottom: '#0d0f16', accent: '#c9d6f2' },
     ink: { primary: '#f8f5ea', secondary: '#cdd1dd' },
     artwork: [
@@ -194,7 +195,8 @@ export const FILMS = [
     className: 'film-fourfold-light',
     nameKey: 'filmFourfoldName',
     conditionKey: 'filmFourfoldCondition',
-    unlock: { type: 'distinct-dayparts', target: 3 },
+    challengeTool: 'colorWidth',
+    unlock: { type: 'achievement', achievement: 'boldColorBands', target: 1 },
     paper: { top: '#fcf6e8', middle: '#efe6d3', bottom: '#dbccb2', accent: '#1f2b45' },
     ink: { primary: '#1f2b45', secondary: '#394760' },
     artwork: [
@@ -258,44 +260,22 @@ function parseColor(value) {
   return rgb.slice(1, 4).map((channel) => Math.max(0, Math.min(255, Number(channel))))
 }
 
-export function getFilmChallengeDaypart(localHour) {
-  if (!Number.isInteger(localHour) || localHour < 0 || localHour > 23) return null
-  if (localHour >= 5 && localHour < 11) return 'morning'
-  if (localHour >= 11 && localHour < 17) return 'day'
-  if (localHour >= 17 && localHour < 23) return 'evening'
-  return 'night'
-}
-
-function hasEclipseContrast(samples = {}) {
-  let darkest = Infinity
-  let brightest = -Infinity
-
-  for (const key of COLOR_KEYS) {
-    const rgb = parseColor(samples[key])
-    if (!rgb || rgb.some((channel) => !Number.isFinite(channel))) return false
-    const { lightness } = rgbToOklch(...rgb)
-    darkest = Math.min(darkest, lightness)
-    brightest = Math.max(brightest, lightness)
-  }
-
-  return darkest <= FILM_CHALLENGE_RULES.eclipseDarkLightness
-    && brightest >= FILM_CHALLENGE_RULES.eclipseBrightLightness
-}
-
-export function createFilmChallenges(day, defaultCaption = '', localHour = new Date().getHours()) {
+export function createFilmChallenges(day, defaultCaption = '') {
   const caption = typeof day?.caption === 'string' ? day.caption.trim() : ''
   const defaultText = typeof defaultCaption === 'string' ? defaultCaption.trim() : ''
-  const characterCount = Array.from(caption.replace(/\s/gu, '')).length
+  const hasOwnWords = caption.replace(/\s/gu, '').length > 0 && caption !== defaultText
   const transparency = day?.composition?.transparency
   const angle = day?.composition?.angle
+  const radius = day?.composition?.radius
+  const colorWidth = day?.composition?.colorWidth
 
   return {
     version: FILM_CHALLENGE_VERSION,
-    customCaption: caption !== defaultText && characterCount >= FILM_CHALLENGE_RULES.customCaptionCharacters,
+    customCaption: hasOwnWords,
     mistTransparency: Number.isFinite(transparency) && transparency >= FILM_CHALLENGE_RULES.mistTransparency,
     compactArc: Number.isFinite(angle) && angle >= 10 && angle <= FILM_CHALLENGE_RULES.compactArcDegrees,
-    eclipseContrast: hasEclipseContrast(day?.samples),
-    daypart: getFilmChallengeDaypart(localHour),
+    expandedRadius: Number.isFinite(radius) && radius >= FILM_CHALLENGE_RULES.expandedRadius,
+    boldColorBands: Number.isFinite(colorWidth) && colorWidth >= FILM_CHALLENGE_RULES.boldColorBands,
   }
 }
 
@@ -328,15 +308,6 @@ function countFilmAchievement(completedDays, achievement) {
   return count
 }
 
-function countDistinctFilmDayparts(completedDays) {
-  const dayparts = new Set()
-  for (const day of completedDays) {
-    const daypart = getStoredFilmChallenges(day)?.daypart
-    if (FILM_DAYPARTS.has(daypart)) dayparts.add(daypart)
-  }
-  return dayparts.size
-}
-
 export function getFilmProgress(film, completedDays = []) {
   const target = film.unlock.target
   let current = 0
@@ -345,7 +316,6 @@ export function getFilmProgress(film, completedDays = []) {
   if (film.unlock.type === 'consecutive-days') current = getLongestCompletionStreak(completedDays)
   if (film.unlock.type === 'all-green-rainbow') current = countAllGreenRainbows(completedDays)
   if (film.unlock.type === 'achievement') current = countFilmAchievement(completedDays, film.unlock.achievement)
-  if (film.unlock.type === 'distinct-dayparts') current = countDistinctFilmDayparts(completedDays)
   if (film.unlock.type === 'always') current = target
 
   return { current: Math.min(current, target), target, met: current >= target }
