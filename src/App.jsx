@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
@@ -18,6 +18,7 @@ const FILM_PREVIEW_PHOTOS = {}
 const DEFAULT_FILM_INK = '#241435'
 const DEFAULT_FILM_INK_MUTED = '#625c63'
 const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
+const FILM_DAYPART_LABEL_KEYS = Object.freeze({ morning: 'filmDaypartMorning', midday: 'filmDaypartMidday', night: 'filmDaypartNight' })
 const DEV_QUERY = import.meta.env.DEV ? new URLSearchParams(location.search) : null
 const QA_MODE = DEV_QUERY?.get('qa') ?? null
 const QA_FILM_ID = DEV_QUERY?.get('film') ?? null
@@ -1410,11 +1411,16 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
         const isUnlocked = unlocked.has(film.id)
         const isSelected = filmCollection.selectedFilmId === film.id
         const progress = getFilmProgress(film, completedDays)
+        const collectedDayparts = film.unlock.type === 'distinct-dayparts' ? new Set(getCollectedFilmDayparts(completedDays)) : null
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
           <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /></div>
           <h2>{t[film.nameKey]}</h2>
           {isUnlocked ? <button className={`film-use-button ${isSelected ? 'is-active' : ''}`} type="button" disabled={isSelected} aria-pressed={isSelected} onClick={() => onSelectFilm(film.id)}>{isSelected ? t.filmSelected : t.useFilm}</button> : <>
             <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
+            {collectedDayparts ? <div className="film-daypart-list" role="list" aria-label={t.filmDaypartProgressLabel}>{FILM_DAYPART_KEYS.map((daypart) => {
+              const isCollected = collectedDayparts.has(daypart)
+              return <div className={`film-daypart-item ${isCollected ? 'is-collected' : 'is-pending'}`} role="listitem" key={daypart}><span>{t[FILM_DAYPART_LABEL_KEYS[daypart]]}</span><b><Icon name={isCollected ? 'check' : 'film'} size={13} />{isCollected ? t.filmDaypartDone : t.filmDaypartPending}</b></div>
+            })}</div> : null}
             <div className="film-progress"><div><span>{formatText(t.filmProgress, progress)}</span><b>{progress.current}/{progress.target}</b></div><i><em style={{ width: `${progress.target ? Math.min(100, progress.current / progress.target * 100) : 100}%` }} /></i></div>
           </>}
         </article>

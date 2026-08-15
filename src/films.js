@@ -3,16 +3,27 @@ import { COLOR_KEYS, rgbToOklch } from './colorAnalysis.js'
 export const DEFAULT_FILM_ID = 'classic-white'
 export const FILM_COLLECTION_SCHEMA_VERSION = 1
 export const FILM_CHALLENGE_VERSION = 1
+export const FILM_DAYPART_KEYS = Object.freeze(['morning', 'midday', 'night'])
 
 export const FILM_CHALLENGE_RULES = Object.freeze({
   mistTransparency: 0.55,
   compactArcDegrees: 60,
   expandedRadius: 1.5,
-  boldColorBands: 1.5,
 })
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const DAY_IN_MS = 86_400_000
+const FILM_ID_ALIASES = Object.freeze({ 'fourfold-light': 'threefold-light' })
+const FILM_DAYPART_ALIASES = Object.freeze({
+  morning: 'morning',
+  midday: 'midday',
+  noon: 'midday',
+  daytime: 'midday',
+  afternoon: 'midday',
+  night: 'night',
+  evening: 'night',
+  'late-night': 'night',
+})
 
 export const FILMS = [
   {
@@ -114,14 +125,16 @@ export const FILMS = [
     paper: { top: '#fff9e8', middle: '#ead7b3', bottom: '#d7b081', accent: '#24324a' },
     ink: { primary: '#24324a', secondary: '#354159' },
     artwork: [
-      { type: 'path', layer: 'foreground', d: 'M 8 88 H 58 M 8 88 V 154 M 8 444 H 52 M 8 444 V 510 M 8 800 H 58 M 8 800 V 866', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.72 },
-      { type: 'path', layer: 'foreground', d: 'M 992 188 H 942 M 992 188 V 254 M 992 602 H 948 M 992 602 V 668 M 992 1010 H 942 M 992 1010 V 1076', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.72 },
-      { type: 'rect', layer: 'foreground', cx: 24, cy: 290, width: 24, height: 84, rotation: -2, fill: '#a94f3d', opacity: 0.64 },
-      { type: 'rect', layer: 'foreground', cx: 976, cy: 390, width: 24, height: 84, rotation: 2, fill: '#a94f3d', opacity: 0.64 },
-      { type: 'rect', layer: 'foreground', cx: 24, cy: 650, width: 13, height: 58, rotation: 1, fill: '#a94f3d', opacity: 0.52 },
-      { type: 'rect', layer: 'foreground', cx: 976, cy: 820, width: 13, height: 58, rotation: -1, fill: '#a94f3d', opacity: 0.52 },
-      { type: 'path', d: 'M 18 1464 H 44 V 1398 M 30 1476 H 58', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.66 },
-      { type: 'path', d: 'M 982 1464 H 956 V 1398 M 970 1476 H 942', fill: 'none', stroke: '#a94f3d', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.6 },
+      { type: 'path', layer: 'foreground', d: 'M -20 102 H 22 V 178 H 56 V 254 H 22 V 334 H 56 V 410 H 18 V 490 H -20', fill: 'none', stroke: '#80603d', strokeWidth: 22, strokeLinejoin: 'round', opacity: 0.16 },
+      { type: 'path', layer: 'foreground', d: 'M -20 102 H 22 V 178 H 56 V 254 H 22 V 334 H 56 V 410 H 18 V 490 H -20', fill: 'none', stroke: 'accent', strokeWidth: 11, strokeLinejoin: 'round', opacity: 0.78 },
+      { type: 'path', layer: 'foreground', d: 'M -16 118 H 12 V 190 H 46 V 242 H 12 V 346 H 46 V 398 H 10 V 474 H -16', fill: 'none', stroke: '#a94f3d', strokeWidth: 6, strokeLinejoin: 'round', opacity: 0.68 },
+      { type: 'path', layer: 'foreground', d: 'M 1020 616 H 978 V 692 H 944 V 768 H 978 V 848 H 944 V 924 H 982 V 1004 H 1020', fill: 'none', stroke: '#80603d', strokeWidth: 22, strokeLinejoin: 'round', opacity: 0.16 },
+      { type: 'path', layer: 'foreground', d: 'M 1020 616 H 978 V 692 H 944 V 768 H 978 V 848 H 944 V 924 H 982 V 1004 H 1020', fill: 'none', stroke: 'accent', strokeWidth: 11, strokeLinejoin: 'round', opacity: 0.78 },
+      { type: 'path', layer: 'foreground', d: 'M 1016 632 H 988 V 704 H 954 V 756 H 988 V 860 H 954 V 912 H 990 V 988 H 1016', fill: 'none', stroke: '#a94f3d', strokeWidth: 6, strokeLinejoin: 'round', opacity: 0.68 },
+      { type: 'path', d: 'M 142 18 H 384 L 414 6 H 586 L 616 18 H 858', fill: 'none', stroke: 'accent', strokeWidth: 6, strokeLinejoin: 'round', opacity: 0.46 },
+      { type: 'path', d: 'M 174 28 H 402 L 430 16 H 570 L 598 28 H 826', fill: 'none', stroke: '#a94f3d', strokeWidth: 4, strokeLinejoin: 'round', opacity: 0.48 },
+      { type: 'path', d: 'M 176 1208 H 374 L 404 1198 H 456 L 476 1208 H 524 L 544 1198 H 596 L 626 1208 H 824', fill: 'none', stroke: 'accent', strokeWidth: 6, strokeLinejoin: 'round', opacity: 0.38 },
+      { type: 'path', d: 'M 226 1217 H 392 L 420 1207 H 580 L 608 1217 H 774', fill: 'none', stroke: '#a94f3d', strokeWidth: 4, strokeLinejoin: 'round', opacity: 0.44 },
     ],
   },
   {
@@ -191,12 +204,11 @@ export const FILMS = [
     ],
   },
   {
-    id: 'fourfold-light',
-    className: 'film-fourfold-light',
-    nameKey: 'filmFourfoldName',
-    conditionKey: 'filmFourfoldCondition',
-    challengeTool: 'colorWidth',
-    unlock: { type: 'achievement', achievement: 'boldColorBands', target: 1 },
+    id: 'threefold-light',
+    className: 'film-threefold-light',
+    nameKey: 'filmThreefoldName',
+    conditionKey: 'filmThreefoldCondition',
+    unlock: { type: 'distinct-dayparts', target: 3 },
     paper: { top: '#fcf6e8', middle: '#efe6d3', bottom: '#dbccb2', accent: '#1f2b45' },
     ink: { primary: '#1f2b45', secondary: '#394760' },
     artwork: [
@@ -216,8 +228,12 @@ export const FILMS = [
 
 const FILM_BY_ID = new Map(FILMS.map((film) => [film.id, film]))
 
+function normalizeFilmId(id) {
+  return FILM_ID_ALIASES[id] ?? id
+}
+
 export function getFilm(id) {
-  return FILM_BY_ID.get(id) ?? FILM_BY_ID.get(DEFAULT_FILM_ID)
+  return FILM_BY_ID.get(normalizeFilmId(id)) ?? FILM_BY_ID.get(DEFAULT_FILM_ID)
 }
 
 function completedDates(completedDays = []) {
@@ -260,6 +276,24 @@ function parseColor(value) {
   return rgb.slice(1, 4).map((channel) => Math.max(0, Math.min(255, Number(channel))))
 }
 
+export function getFilmDaypartForHour(hour) {
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null
+  if (hour >= 5 && hour < 11) return 'morning'
+  if (hour >= 11 && hour < 17) return 'midday'
+  return 'night'
+}
+
+function getCompletionDaypart(completedAt) {
+  if (typeof completedAt !== 'string' || !completedAt.trim()) return null
+  const completedDate = new Date(completedAt)
+  if (!Number.isFinite(completedDate.getTime())) return null
+  return getFilmDaypartForHour(completedDate.getHours())
+}
+
+function normalizeFilmDaypart(daypart) {
+  return typeof daypart === 'string' ? (FILM_DAYPART_ALIASES[daypart] ?? null) : null
+}
+
 export function createFilmChallenges(day, defaultCaption = '') {
   const caption = typeof day?.caption === 'string' ? day.caption.trim() : ''
   const defaultText = typeof defaultCaption === 'string' ? defaultCaption.trim() : ''
@@ -267,7 +301,7 @@ export function createFilmChallenges(day, defaultCaption = '') {
   const transparency = day?.composition?.transparency
   const angle = day?.composition?.angle
   const radius = day?.composition?.radius
-  const colorWidth = day?.composition?.colorWidth
+  const daypart = getCompletionDaypart(day?.completedAt)
 
   return {
     version: FILM_CHALLENGE_VERSION,
@@ -275,7 +309,7 @@ export function createFilmChallenges(day, defaultCaption = '') {
     mistTransparency: Number.isFinite(transparency) && transparency >= FILM_CHALLENGE_RULES.mistTransparency,
     compactArc: Number.isFinite(angle) && angle >= 10 && angle <= FILM_CHALLENGE_RULES.compactArcDegrees,
     expandedRadius: Number.isFinite(radius) && radius >= FILM_CHALLENGE_RULES.expandedRadius,
-    boldColorBands: Number.isFinite(colorWidth) && colorWidth >= FILM_CHALLENGE_RULES.boldColorBands,
+    ...(daypart ? { daypart } : {}),
   }
 }
 
@@ -308,6 +342,15 @@ function countFilmAchievement(completedDays, achievement) {
   return count
 }
 
+export function getCollectedFilmDayparts(completedDays = []) {
+  const collected = new Set()
+  for (const day of completedDays) {
+    const daypart = normalizeFilmDaypart(getStoredFilmChallenges(day)?.daypart)
+    if (daypart) collected.add(daypart)
+  }
+  return FILM_DAYPART_KEYS.filter((daypart) => collected.has(daypart))
+}
+
 export function getFilmProgress(film, completedDays = []) {
   const target = film.unlock.target
   let current = 0
@@ -316,6 +359,7 @@ export function getFilmProgress(film, completedDays = []) {
   if (film.unlock.type === 'consecutive-days') current = getLongestCompletionStreak(completedDays)
   if (film.unlock.type === 'all-green-rainbow') current = countAllGreenRainbows(completedDays)
   if (film.unlock.type === 'achievement') current = countFilmAchievement(completedDays, film.unlock.achievement)
+  if (film.unlock.type === 'distinct-dayparts') current = getCollectedFilmDayparts(completedDays).length
   if (film.unlock.type === 'always') current = target
 
   return { current: Math.min(current, target), target, met: current >= target }
@@ -348,17 +392,19 @@ function sameArray(left = [], right = []) {
 }
 
 export function normalizeFilmCollection(record, completedDays = []) {
-  const storedIds = Array.isArray(record?.unlockedFilmIds)
+  const rawStoredIds = Array.isArray(record?.unlockedFilmIds)
     ? record.unlockedFilmIds.filter((id) => typeof id === 'string')
     : []
+  const storedIds = rawStoredIds.map(normalizeFilmId)
   const unlockedFilmIds = []
   for (const id of [DEFAULT_FILM_ID, ...storedIds, ...getDerivedUnlockedFilmIds(completedDays)]) {
     if (!unlockedFilmIds.includes(id)) unlockedFilmIds.push(id)
   }
-  const selectedFilmId = unlockedFilmIds.includes(record?.selectedFilmId) ? record.selectedFilmId : DEFAULT_FILM_ID
+  const requestedFilmId = normalizeFilmId(record?.selectedFilmId)
+  const selectedFilmId = unlockedFilmIds.includes(requestedFilmId) ? requestedFilmId : DEFAULT_FILM_ID
   const needsSave = !record
     || record.schemaVersion !== FILM_COLLECTION_SCHEMA_VERSION
-    || !sameArray(storedIds, unlockedFilmIds)
+    || !sameArray(rawStoredIds, unlockedFilmIds)
     || record.selectedFilmId !== selectedFilmId
 
   return { schemaVersion: FILM_COLLECTION_SCHEMA_VERSION, unlockedFilmIds, selectedFilmId, needsSave }

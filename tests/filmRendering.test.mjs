@@ -69,6 +69,9 @@ assert.match(getFilmRenderModel('pink-pop').svg, /<path d="M 665 1405/)
 assert.match(getFilmRenderModel('mint-green').svg, /stroke-linecap="round"/)
 const letterpressArtwork = getFilmRenderModel('letterpress-ochre').svg + getFilmRenderModel('letterpress-ochre').overlaySvg
 assert.match(letterpressArtwork, /#a94f3d/)
+assert.match(letterpressArtwork, /M -20 102 H 22 V 178 H 56/)
+assert.match(letterpressArtwork, /M 176 1208 H 374 L 404 1198/)
+assert.doesNotMatch(letterpressArtwork, /M 8 88 H 58/, 'letterpress artwork must use a cohesive pressed-ribbon motif instead of crop marks')
 assert.equal(letterpressArtwork.includes('<text'), false, 'letterpress artwork must not imitate printed copy or trademarks')
 const vellumArtwork = getFilmRenderModel('vellum-mist').svg + getFilmRenderModel('vellum-mist').overlaySvg
 assert.match(vellumArtwork, /#b7a8d8/)
@@ -79,8 +82,8 @@ assert.equal(cometArtwork.includes('<circle'), false, 'comet artwork must use co
 const eclipseModel = getFilmRenderModel('eclipse-silver')
 assert.match(eclipseModel.svg, /stop-color="#0d0f16"/)
 assert.equal((eclipseModel.svg + eclipseModel.overlaySvg).includes('<circle'), false, 'eclipse artwork must use cropped exposure arcs instead of star shapes')
-const fourfoldArtwork = getFilmRenderModel('fourfold-light').svg + getFilmRenderModel('fourfold-light').overlaySvg
-for (const color of ['#e98c78', '#e6b84a', '#3d8f87', '#59517d']) assert.match(fourfoldArtwork, new RegExp(color))
+const threefoldArtwork = getFilmRenderModel('threefold-light').svg + getFilmRenderModel('threefold-light').overlaySvg
+for (const color of ['#e98c78', '#e6b84a', '#3d8f87', '#59517d']) assert.match(threefoldArtwork, new RegExp(color))
 assert.equal(getFilmRenderModel('missing-film').film.id, DEFAULT_FILM_ID)
 
 console.log('Film rendering: previews, studio, and exports share one immutable 2:3 two-layer SVG and layout contract.')

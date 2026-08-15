@@ -349,3 +349,46 @@ img { max-width: 100%; }
   text-wrap: pretty;
   -webkit-line-clamp: unset;
 }
+
+.film-daypart-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.film-daypart-item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1.5px solid #c9bdd6;
+  border-radius: 8px;
+  background: #fff;
+  color: #584b68;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.film-daypart-item > span,
+.film-daypart-item > b {
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.film-daypart-item > b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.film-daypart-item.is-collected {
+  border-color: #147457;
+  background: #effff5;
+  color: #075d43;
+}

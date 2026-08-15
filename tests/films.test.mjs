@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { COLOR_KEYS } from '../src/colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, FILM_CHALLENGE_VERSION, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, isAllGreenRainbow, normalizeFilmCollection } from '../src/films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, isAllGreenRainbow, normalizeFilmCollection } from '../src/films.js'
 import { translations } from '../src/i18n.js'
 
 const completed = (date, overrides = {}) => ({ date, completedAt: `${date}T12:00:00.000Z`, photos: {}, samples: {}, ...overrides })
@@ -18,13 +18,14 @@ assert.equal(getFilm(undefined).id, DEFAULT_FILM_ID)
 assert.deepEqual(normalizeFilmCollection(null, []).unlockedFilmIds, [DEFAULT_FILM_ID])
 assert.equal(FILMS.length, 9)
 for (const language of Object.values(translations)) {
-  for (const key of ['filmChallengeGuideTitle', 'filmChallengeGuideHint', 'filmChallengeMet', 'filmChallengePending']) assert.equal(typeof language[key], 'string')
+  for (const key of ['filmChallengeGuideTitle', 'filmChallengeGuideHint', 'filmChallengeMet', 'filmChallengePending', 'filmDaypartProgressLabel', 'filmDaypartMorning', 'filmDaypartMidday', 'filmDaypartNight', 'filmDaypartDone', 'filmDaypartPending']) assert.equal(typeof language[key], 'string')
   for (const film of FILMS) {
     assert.equal(typeof language[film.nameKey], 'string', `${film.id} must have a localized name`)
     assert.equal(typeof language[film.conditionKey], 'string', `${film.id} must have a localized condition`)
   }
   const newConditions = FILMS.slice(4).map((film) => language[film.conditionKey]).join(' ')
-  assert.doesNotMatch(newConditions, /OKLCH|05:00/, 'new film conditions must use visible editor actions instead of technical calculations')
+  assert.doesNotMatch(newConditions, /OKLCH/, 'new film conditions must avoid invisible technical calculations')
+  assert.match(language[getFilm('threefold-light').conditionKey], /05:00.*10:59.*11:00.*16:59.*17:00.*04:59/, 'threefold light must explain every time boundary')
 }
 
 const firstPolaroid = [completed('2026-08-01')]
@@ -51,14 +52,15 @@ assert.equal(getFilmProgress(FILMS[3], [completed('2026-08-04')]).met, false)
 assert.deepEqual(getFilmProgressChanges([], [completed('2026-08-04', greenRainbow)]).find((change) => change.filmId === 'mint-green'),
   { filmId: 'mint-green', previous: 0, current: 1, target: 1, unlocked: true })
 
-const baseChallengeDay = { caption: '我的話', composition: { transparency: 0.55, angle: 60, radius: 1.5, colorWidth: 1.5 } }
+const localCompletedAt = (hour, minute = 0) => new Date(2026, 7, 15, hour, minute, 0).toISOString()
+const baseChallengeDay = { caption: '我的話', completedAt: localCompletedAt(11), composition: { transparency: 0.55, angle: 60, radius: 1.5, colorWidth: 1.5 } }
 const baseChallenges = createFilmChallenges(baseChallengeDay, 'NIJI 拾色日記')
 assert.equal(baseChallenges.version, FILM_CHALLENGE_VERSION)
 assert.equal(baseChallenges.customCaption, true)
 assert.equal(baseChallenges.mistTransparency, true)
 assert.equal(baseChallenges.compactArc, true)
 assert.equal(baseChallenges.expandedRadius, true)
-assert.equal(baseChallenges.boldColorBands, true)
+assert.equal(baseChallenges.daypart, 'midday')
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: '我' }, 'NIJI 拾色日記').customCaption, true, 'any real custom caption is understandable and sufficient')
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: '   ' }, 'NIJI 拾色日記').customCaption, false)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: 'NIJI 拾色日記' }, 'NIJI 拾色日記').customCaption, false)
@@ -68,18 +70,31 @@ assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseC
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, angle: 60 } }, '').compactArc, true)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, radius: 1.49 } }, '').expandedRadius, false)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, radius: 1.5 } }, '').expandedRadius, true)
-assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, colorWidth: 1.49 } }, '').boldColorBands, false)
-assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, colorWidth: 1.5 } }, '').boldColorBands, true)
 assert.deepEqual(createFilmChallenges({ caption: '我', composition: {} }, ''), {
   version: FILM_CHALLENGE_VERSION,
   customCaption: true,
   mistTransparency: false,
   compactArc: false,
   expandedRadius: false,
-  boldColorBands: false,
 })
 
-assert.deepEqual(FILMS.slice(4).map((film) => film.challengeTool), ['caption', 'transparency', 'angle', 'radius', 'colorWidth'])
+assert.deepEqual([
+  [4, 'night'], [5, 'morning'], [10, 'morning'], [11, 'midday'], [16, 'midday'], [17, 'night'], [23, 'night'],
+].map(([hour, expected]) => [getFilmDaypartForHour(hour), expected]), [
+  ['night', 'night'], ['morning', 'morning'], ['morning', 'morning'], ['midday', 'midday'], ['midday', 'midday'], ['night', 'night'], ['night', 'night'],
+])
+assert.equal(getFilmDaypartForHour(-1), null)
+assert.equal(getFilmDaypartForHour(24), null)
+assert.deepEqual([
+  createFilmChallenges({ completedAt: localCompletedAt(4, 59) }).daypart,
+  createFilmChallenges({ completedAt: localCompletedAt(5) }).daypart,
+  createFilmChallenges({ completedAt: localCompletedAt(10, 59) }).daypart,
+  createFilmChallenges({ completedAt: localCompletedAt(11) }).daypart,
+  createFilmChallenges({ completedAt: localCompletedAt(16, 59) }).daypart,
+  createFilmChallenges({ completedAt: localCompletedAt(17) }).daypart,
+], ['night', 'morning', 'morning', 'midday', 'midday', 'night'])
+assert.deepEqual(FILM_DAYPART_KEYS, ['morning', 'midday', 'night'])
+assert.deepEqual(FILMS.slice(4).map((film) => film.challengeTool), ['caption', 'transparency', 'angle', 'radius', undefined])
 
 const letterpress = getFilm('letterpress-ochre')
 assert.equal(getFilmProgress(letterpress, [challengeRecord('2026-08-05', { customCaption: true })]).met, true)
@@ -90,11 +105,24 @@ assert.equal(getFilmProgress(getFilm('comet-orange'), [challengeRecord('2026-08-
 assert.equal(getFilmProgress(getFilm('eclipse-silver'), [challengeRecord('2026-08-08', { eclipseContrast: true })]).met, false, 'the hidden color calculation must no longer unlock eclipse silver')
 assert.equal(getFilmProgress(getFilm('eclipse-silver'), [challengeRecord('2026-08-08', { expandedRadius: true })]).met, true)
 
-const fourfold = getFilm('fourfold-light')
-assert.deepEqual(getFilmProgress(fourfold, [challengeRecord('2026-08-09', { daypart: 'morning' })]), { current: 0, target: 1, met: false })
-assert.deepEqual(getFilmProgress(fourfold, [challengeRecord('2026-08-09', { boldColorBands: true })]), { current: 1, target: 1, met: true })
-assert.deepEqual(getFilmProgressChanges([], [challengeRecord('2026-08-09', { boldColorBands: true })]).find((change) => change.filmId === 'fourfold-light'),
-  { filmId: 'fourfold-light', previous: 0, current: 1, target: 1, unlocked: true })
+const threefold = getFilm('threefold-light')
+const morningRecord = challengeRecord('2026-08-09', { daypart: 'morning' })
+const repeatedMorningRecord = challengeRecord('2026-08-10', { daypart: 'morning' })
+const middayRecord = challengeRecord('2026-08-12', { daypart: 'midday' })
+const repeatedMiddayRecord = challengeRecord('2026-08-14', { daypart: 'midday' })
+const nightRecord = challengeRecord('2026-08-16', { daypart: 'night' })
+assert.equal(getFilm('fourfold-light').id, 'threefold-light', 'the unreleased internal id must retain a safe compatibility alias')
+assert.deepEqual(getFilmProgress(threefold, [morningRecord]), { current: 1, target: 3, met: false })
+assert.deepEqual(getFilmProgress(threefold, [morningRecord, repeatedMorningRecord]), { current: 1, target: 3, met: false })
+assert.deepEqual(getFilmProgress(threefold, [morningRecord, middayRecord]), { current: 2, target: 3, met: false })
+assert.deepEqual(getCollectedFilmDayparts([morningRecord, middayRecord, nightRecord]), ['morning', 'midday', 'night'])
+assert.deepEqual(getFilmProgress(threefold, [morningRecord, middayRecord, nightRecord]), { current: 3, target: 3, met: true })
+assert.deepEqual(getFilmProgress(threefold, [challengeRecord('2026-08-09', { daypart: 'breakfast' })]), { current: 0, target: 3, met: false })
+assert.deepEqual(getFilmProgress(threefold, [completed('2026-08-09', { achievements: { filmChallenges: { daypart: 'morning' } } })]), { current: 0, target: 3, met: false })
+assert.deepEqual(getCollectedFilmDayparts([challengeRecord('2026-08-09', { daypart: 'evening' })]), ['night'], 'legacy evening data must safely map into the new night period')
+assert.equal(getFilmProgressChanges([morningRecord, middayRecord], [morningRecord, middayRecord, repeatedMiddayRecord]).some((change) => change.filmId === 'threefold-light'), false)
+assert.deepEqual(getFilmProgressChanges([morningRecord, middayRecord], [morningRecord, middayRecord, nightRecord]).find((change) => change.filmId === 'threefold-light'),
+  { filmId: 'threefold-light', previous: 2, current: 3, target: 3, unlocked: true })
 
 const unlocked = normalizeFilmCollection(null, [...threeDayStreak, completed('2026-08-04', greenRainbow)])
 assert.deepEqual(unlocked.unlockedFilmIds, [DEFAULT_FILM_ID, 'sky-blue', 'pink-pop', 'mint-green'])
@@ -102,8 +130,9 @@ assert.equal(unlocked.selectedFilmId, DEFAULT_FILM_ID)
 const preservedSelection = normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID, 'mint-green'], selectedFilmId: 'mint-green' }, [])
 assert.equal(preservedSelection.selectedFilmId, 'mint-green', 'an existing unlocked selection must survive the expanded film catalog')
 const preservedChangedChallenge = normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID, 'eclipse-silver', 'fourfold-light'], selectedFilmId: 'fourfold-light' }, [])
-assert.deepEqual(preservedChangedChallenge.unlockedFilmIds, [DEFAULT_FILM_ID, 'eclipse-silver', 'fourfold-light'], 'changing a challenge must never revoke films already unlocked')
-assert.equal(preservedChangedChallenge.selectedFilmId, 'fourfold-light')
+assert.deepEqual(preservedChangedChallenge.unlockedFilmIds, [DEFAULT_FILM_ID, 'eclipse-silver', 'threefold-light'], 'changing the unreleased internal id must never revoke a locally unlocked film')
+assert.equal(preservedChangedChallenge.selectedFilmId, 'threefold-light')
+assert.equal(preservedChangedChallenge.needsSave, true)
 assert.equal(normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID], selectedFilmId: 'sky-blue' }, []).selectedFilmId, DEFAULT_FILM_ID)
 
 console.log('Film model: classic white is the compatible default, and film unlock conditions derive from completed history.')

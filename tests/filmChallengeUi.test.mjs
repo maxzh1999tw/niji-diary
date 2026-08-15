@@ -13,11 +13,15 @@ assert.doesNotMatch(appSource, /setChallengeResults/, 'live challenge feedback m
 assert.match(appSource, /key: 'colorWidth',[^\n]+min: 0\.5, max: 2/)
 assert.match(appSource, /onFocus=\{captionChallengeFilm \? \(\) => setActiveTool\('caption'\) : undefined\}/)
 assert.match(appSource, /challengeMet \? <span className="toolbar-challenge-check"/)
+assert.match(appSource, /film\.unlock\.type === 'distinct-dayparts'/)
+assert.match(appSource, /FILM_DAYPART_KEYS\.map\(\(daypart\)/)
+assert.match(appSource, /film-daypart-item \$\{isCollected \? 'is-collected' : 'is-pending'\}/)
 
 assert.match(appStyles, /\.film-challenge-status-copy strong, \.film-challenge-status-copy small \{[^}]*font-size: 12px/)
 assert.match(appStyles, /\.film-challenge-summary-heading small \{[^}]*font-size: 12px/)
 assert.match(appStyles, /\.film-challenge-summary-item b, \.film-challenge-summary-item small \{[^}]*font-size: 12px/)
 assert.match(appStyles, /\.editor-toolbar \{[^}]*grid-template-columns: repeat\(5, minmax\(52px, 1fr\)\)/)
+assert.match(appStyles, /\.film-daypart-item > span,[\s\S]*?font-size: 12px/)
 assert.doesNotMatch(appStyles, /\.film-challenge-(?:status-copy|summary-heading|summary-item)[^{]*\{[^}]*(?:white-space:\s*nowrap|text-overflow:\s*ellipsis|line-clamp)/)
 
-console.log('Film challenge UI: every new condition maps to a visible editor action with immediate text-and-icon feedback.')
+console.log('Film challenge UI: editor conditions have live feedback, and time-based progress names each collected period.')
