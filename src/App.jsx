@@ -814,7 +814,6 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
       </div>
       <div className={`mission-card ${isComplete ? 'is-complete' : ''}`}>
         <div className="rainbow-orbit" aria-hidden="true"><i /><i /><i /></div>
-        <span className="mission-progress">{isComplete ? t.questCleared : formatText(t.colorsLeft, { count: 7 - count })}</span>
         <div className="mission-copy">
           <h2>{isComplete ? t.rainbowReady : t.findTheRainbow}</h2>
           <p>{isComplete ? t.comeBackTomorrow : t.photoFirstHint}</p>
@@ -823,7 +822,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
       </div>
 
       <div className="collection-panel">
-        <div className="panel-title"><h2>{t.colorSlots}</h2><span>{count === 7 ? t.allFound : formatText(t.foundCount, { count })}</span></div>
+        <div className="panel-title"><h2>{t.colorSlots}</h2><span className="energy-progress">{isComplete ? t.questCleared : formatText(t.colorsLeft, { count: 7 - count })}</span></div>
         {loading ? <div className="slot-loading" /> : <EnergyStrip photos={visiblePhotos} samples={samples} labels={t.colors} interactive={!isComplete} onSelect={onRemove} />}
         {!isComplete && count > 0 ? <p className="slot-hint">{t.tapToRemove}</p> : null}
       </div>
