@@ -27,6 +27,9 @@ for (const language of Object.values(translations)) {
   assert.doesNotMatch(newConditions, /OKLCH/, 'new film conditions must avoid invisible technical calculations')
   assert.match(language[getFilm('threefold-light').conditionKey], /05:00.*10:59.*11:00.*16:59.*17:00.*04:59/, 'threefold light must explain every time boundary')
 }
+assert.equal(translations['zh-Hant'].filmLetterpressCondition, '在製作拍立得時修改下方的預設文字，改成自己的話。')
+assert.match(translations.en.filmLetterpressCondition, /While making a Polaroid/)
+assert.match(translations.ja.filmLetterpressCondition, /作成中/)
 
 const firstPolaroid = [completed('2026-08-01')]
 assert.equal(getFilmProgress(FILMS[1], firstPolaroid).met, true)
