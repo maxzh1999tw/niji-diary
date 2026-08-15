@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './styles.css'
 
 const isNijiCloudflareSite =
+  window.location.hostname === 'mia-and-max.com' ||
   window.location.hostname === 'niji.mia-and-max.com' ||
   window.location.hostname === 'niji-diary.pages.dev' ||
   window.location.hostname.endsWith('.niji-diary.pages.dev')
