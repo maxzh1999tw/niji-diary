@@ -814,8 +814,8 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
       </div>
       <div className={`mission-card ${isComplete ? 'is-complete' : ''}`}>
         <div className="rainbow-orbit" aria-hidden="true"><i /><i /><i /></div>
+        <span className="mission-progress">{isComplete ? t.questCleared : formatText(t.colorsLeft, { count: 7 - count })}</span>
         <div className="mission-copy">
-          <span>{isComplete ? t.questCleared : formatText(t.colorsLeft, { count: 7 - count })}</span>
           <h2>{isComplete ? t.rainbowReady : t.findTheRainbow}</h2>
           <p>{isComplete ? t.comeBackTomorrow : t.photoFirstHint}</p>
           {!isComplete ? <small className="mission-note">{t.questNote}</small> : null}
