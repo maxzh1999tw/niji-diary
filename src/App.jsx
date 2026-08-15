@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
-import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
@@ -15,6 +15,8 @@ const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', 
 const COMPLETED_COLOR_SLOTS = Object.freeze(Object.fromEntries(COLOR_KEYS.map((key) => [key, true])))
 const FILM_PREVIEW_DATE = '2000-01-01'
 const FILM_PREVIEW_PHOTOS = {}
+const DEFAULT_FILM_INK = '#241435'
+const DEFAULT_FILM_INK_MUTED = '#625c63'
 const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
 const DEV_QUERY = import.meta.env.DEV ? new URLSearchParams(location.search) : null
 const QA_MODE = DEV_QUERY?.get('qa') ?? null
@@ -201,19 +203,19 @@ function fitCanvasText(context, text, maxWidth) {
   return `${fitted}…`
 }
 
-function drawPolaroidCaption(context, day, fallbackCaption, layout) {
+function drawPolaroidCaption(context, day, fallbackCaption, layout, ink = DEFAULT_FILM_INK) {
   const { width, footer } = layout
   const caption = day.caption ?? fallbackCaption
   context.textBaseline = 'middle'
-  context.fillStyle = '#241435'
+  context.fillStyle = day.captionInk ?? ink
   context.font = '600 45px "Noto Sans TC", "Segoe UI", sans-serif'
   context.fillText(fitCanvasText(context, caption, width - footer.x * 2 - footer.dateWidth), footer.x, footer.textY)
 }
 
-function drawPolaroidDate(context, day, lang, layout) {
+function drawPolaroidDate(context, day, lang, layout, ink = DEFAULT_FILM_INK_MUTED) {
   const { width, footer } = layout
   context.textBaseline = 'middle'
-  context.fillStyle = '#625c63'
+  context.fillStyle = ink
   context.font = '600 34px "Noto Sans TC", "Segoe UI", sans-serif'
   context.textAlign = 'right'
   context.fillText(formatDate(day.date, lang, true), width - footer.x, footer.textY)
@@ -270,8 +272,8 @@ async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = 
   // Keep the canvas layer order identical to PolaroidCard: paper, photo/sources,
   // edge decorations, then footer text.
   context.drawImage(filmOverlay, 0, 0, width, height)
-  if (includeCaption) drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout)
-  drawPolaroidDate(context, day, lang, renderModel.layout)
+  if (includeCaption) drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout, renderModel.film.ink?.primary)
+  drawPolaroidDate(context, day, lang, renderModel.layout, renderModel.film.ink?.secondary)
   return canvas.toDataURL('image/jpeg', 0.9)
 }
 
@@ -350,7 +352,7 @@ async function getCompletedPolaroidImage(day, lang, fallbackCaption) {
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
   context.drawImage(image, 0, 0, width, height)
-  drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout)
+  drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout, renderModel.film.ink?.primary)
   return canvas.toDataURL('image/jpeg', 0.9)
 }
 
@@ -614,13 +616,19 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
 
 function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
-  return <div className={`polaroid-card ${film.className} ${className}`} style={{ ...getPolaroidLayoutStyle(), '--film-paper-fallback': film.paper.middle }} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
+  const filmStyle = {
+    ...getPolaroidLayoutStyle(),
+    '--film-paper-fallback': film.paper.middle,
+    '--film-ink': film.ink?.primary ?? DEFAULT_FILM_INK,
+    '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
+  }
+  return <div className={`polaroid-card ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
 }
 
 function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
   if (item.polaroidImage) {
     const caption = item.caption ?? t.defaultCaption
-    return <div className={`polaroid-card stored-polaroid ${className}`}>
+    return <div className={`polaroid-card stored-polaroid ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
       <img src={item.polaroidImage} alt={alt} loading={imageLoading} />
       {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} /></div> : null}
       <div className="stored-polaroid-caption-slot">{editable ? <EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
@@ -1826,7 +1834,18 @@ export default function App() {
     setFinishing(true)
     try {
       const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
-      const renderSource = { ...day, date, cardImage, filmId: filmCollection.selectedFilmId || DEFAULT_FILM_ID, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: new Date().toISOString() }
+      const completionTime = new Date()
+      const filmId = filmCollection.selectedFilmId || DEFAULT_FILM_ID
+      const film = getFilm(filmId)
+      const completionSource = { ...day, date, cardImage, filmId, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: completionTime.toISOString() }
+      const renderSource = {
+        ...completionSource,
+        ...(film.ink?.primary ? { captionInk: film.ink.primary } : {}),
+        achievements: {
+          ...(day.achievements ?? {}),
+          filmChallenges: createFilmChallenges(completionSource, t.defaultCaption, completionTime.getHours()),
+        },
+      }
       const polaroidImage = await renderPolaroidImage(renderSource, lang, t.defaultCaption, false)
       const completedDay = createCompletedDayRecord(renderSource, polaroidImage)
       await completeDraft(completedDay, date)

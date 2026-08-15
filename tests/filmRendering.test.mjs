@@ -2,6 +2,17 @@ import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, FILMS } from '../src/films.js'
 import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayoutStyle, POLAROID_LAYOUT } from '../src/filmRendering.js'
 
+function relativeLuminance(hex) {
+  const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
+    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+function contrastRatio(left, right) {
+  const [lighter, darker] = [relativeLuminance(left), relativeLuminance(right)].sort((a, b) => b - a)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 assert.equal(POLAROID_LAYOUT.width / POLAROID_LAYOUT.height, 2 / 3)
 assert.equal(POLAROID_LAYOUT.photo.width / POLAROID_LAYOUT.photo.height, 4 / 5)
 assert.equal(POLAROID_LAYOUT.sources.y, POLAROID_LAYOUT.photo.y + POLAROID_LAYOUT.photo.height + 24)
@@ -32,6 +43,13 @@ for (const film of FILMS) {
     assert.match(model.overlaySvg, /<rect x="35" y="35" width="930" height="1162.5" fill="black"\/>/)
   }
   assert.match(model.svg, /viewBox="0 0 1000 1500"/)
+  if (film.ink) {
+    for (const ink of Object.values(film.ink)) {
+      for (const paper of [film.paper.top, film.paper.middle, film.paper.bottom]) {
+        assert.ok(contrastRatio(ink, paper) >= 4.5, `${film.id} ${ink} must remain readable on ${paper}`)
+      }
+    }
+  }
 }
 
 const classicSurface = getFilmRenderModel(DEFAULT_FILM_ID).svg
@@ -49,6 +67,20 @@ assert.equal(skyModel.overlaySvg.includes('frame-only'), true, 'sky-blue edge bu
 assert.match(skyModel.svg, /fill="none" stroke="#56c9df"/)
 assert.match(getFilmRenderModel('pink-pop').svg, /<path d="M 665 1405/)
 assert.match(getFilmRenderModel('mint-green').svg, /stroke-linecap="round"/)
+const letterpressArtwork = getFilmRenderModel('letterpress-ochre').svg + getFilmRenderModel('letterpress-ochre').overlaySvg
+assert.match(letterpressArtwork, /#a94f3d/)
+assert.equal(letterpressArtwork.includes('<text'), false, 'letterpress artwork must not imitate printed copy or trademarks')
+const vellumArtwork = getFilmRenderModel('vellum-mist').svg + getFilmRenderModel('vellum-mist').overlaySvg
+assert.match(vellumArtwork, /#b7a8d8/)
+assert.equal(vellumArtwork.includes('<circle'), false, 'vellum mist must not reuse sky-blue bubbles')
+const cometArtwork = getFilmRenderModel('comet-orange').svg + getFilmRenderModel('comet-orange').overlaySvg
+assert.match(cometArtwork, /M 242 1346 C 492 1264/)
+assert.equal(cometArtwork.includes('<circle'), false, 'comet artwork must use continuous trails instead of stars or confetti')
+const eclipseModel = getFilmRenderModel('eclipse-silver')
+assert.match(eclipseModel.svg, /stop-color="#0d0f16"/)
+assert.equal((eclipseModel.svg + eclipseModel.overlaySvg).includes('<circle'), false, 'eclipse artwork must use cropped exposure arcs instead of star shapes')
+const fourfoldArtwork = getFilmRenderModel('fourfold-light').svg + getFilmRenderModel('fourfold-light').overlaySvg
+for (const color of ['#e98c78', '#e6b84a', '#3d8f87', '#59517d']) assert.match(fourfoldArtwork, new RegExp(color))
 assert.equal(getFilmRenderModel('missing-film').film.id, DEFAULT_FILM_ID)
 
 console.log('Film rendering: previews, studio, and exports share one immutable 2:3 two-layer SVG and layout contract.')

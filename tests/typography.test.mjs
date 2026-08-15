@@ -21,5 +21,7 @@ assert.match(appStyles, /Width limits belong to layout containers, not text/)
 assert.match(appStyles, /\.info-hero h1,[\s\S]*?\.developed-heading h2\s*\{\s*text-wrap:\s*balance/)
 assert.match(appStyles, /\.studio-topbar h1,[\s\S]*?white-space:\s*normal/)
 assert.match(appStyles, /\.film-bookmark-condition\s*\{[\s\S]*?-webkit-line-clamp:\s*unset/)
+assert.match(appStyles, /color:\s*var\(--film-ink, var\(--ink\)\)/)
+assert.match(appStyles, /\.polaroid-date\s*\{[^}]*color:\s*var\(--film-ink-muted/)
 
 console.log('Typography: headings, supporting copy, and compact labels use natural wrapping without arbitrary text widths.')

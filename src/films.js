@@ -2,6 +2,17 @@ import { COLOR_KEYS, rgbToOklch } from './colorAnalysis.js'
 
 export const DEFAULT_FILM_ID = 'classic-white'
 export const FILM_COLLECTION_SCHEMA_VERSION = 1
+export const FILM_CHALLENGE_VERSION = 1
+
+export const FILM_CHALLENGE_RULES = Object.freeze({
+  customCaptionCharacters: 6,
+  mistTransparency: 0.55,
+  compactArcDegrees: 60,
+  eclipseDarkLightness: 0.38,
+  eclipseBrightLightness: 0.82,
+})
+
+const FILM_DAYPARTS = new Set(['morning', 'day', 'evening', 'night'])
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const DAY_IN_MS = 86_400_000
@@ -96,6 +107,109 @@ export const FILMS = [
       { type: 'ellipse', cx: 728, cy: 1378, radiusX: 15, radiusY: 34, rotation: -55, opacity: 0.38 },
     ],
   },
+  {
+    id: 'letterpress-ochre',
+    className: 'film-letterpress-ochre',
+    nameKey: 'filmLetterpressName',
+    conditionKey: 'filmLetterpressCondition',
+    unlock: { type: 'achievement', achievement: 'customCaption', target: 1 },
+    paper: { top: '#fff9e8', middle: '#ead7b3', bottom: '#d7b081', accent: '#24324a' },
+    ink: { primary: '#24324a', secondary: '#354159' },
+    artwork: [
+      { type: 'path', layer: 'foreground', d: 'M 8 88 H 58 M 8 88 V 154 M 8 444 H 52 M 8 444 V 510 M 8 800 H 58 M 8 800 V 866', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.72 },
+      { type: 'path', layer: 'foreground', d: 'M 992 188 H 942 M 992 188 V 254 M 992 602 H 948 M 992 602 V 668 M 992 1010 H 942 M 992 1010 V 1076', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.72 },
+      { type: 'rect', layer: 'foreground', cx: 24, cy: 290, width: 24, height: 84, rotation: -2, fill: '#a94f3d', opacity: 0.64 },
+      { type: 'rect', layer: 'foreground', cx: 976, cy: 390, width: 24, height: 84, rotation: 2, fill: '#a94f3d', opacity: 0.64 },
+      { type: 'rect', layer: 'foreground', cx: 24, cy: 650, width: 13, height: 58, rotation: 1, fill: '#a94f3d', opacity: 0.52 },
+      { type: 'rect', layer: 'foreground', cx: 976, cy: 820, width: 13, height: 58, rotation: -1, fill: '#a94f3d', opacity: 0.52 },
+      { type: 'path', d: 'M 18 1464 H 44 V 1398 M 30 1476 H 58', fill: 'none', stroke: 'accent', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.66 },
+      { type: 'path', d: 'M 982 1464 H 956 V 1398 M 970 1476 H 942', fill: 'none', stroke: '#a94f3d', strokeWidth: 7, strokeLinejoin: 'round', opacity: 0.6 },
+    ],
+  },
+  {
+    id: 'vellum-mist',
+    className: 'film-vellum-mist',
+    nameKey: 'filmVellumName',
+    conditionKey: 'filmVellumCondition',
+    unlock: { type: 'achievement', achievement: 'mistTransparency', target: 1 },
+    paper: { top: '#fcfbf7', middle: '#e8e3f2', bottom: '#d9edea', accent: '#73689b' },
+    ink: { primary: '#322a46', secondary: '#554f6b' },
+    artwork: [
+      { type: 'path', layer: 'foreground', d: 'M -46 58 L 82 -12 L 55 382 L -34 520 Z', fill: '#b7a8d8', opacity: 0.34 },
+      { type: 'path', layer: 'foreground', d: 'M -24 246 L 74 174 L 48 704 L -42 792 Z', fill: '#9dcbc3', opacity: 0.28 },
+      { type: 'path', layer: 'foreground', d: 'M 1048 112 L 930 -18 L 948 448 L 1038 562 Z', fill: '#c7badf', opacity: 0.34 },
+      { type: 'path', layer: 'foreground', d: 'M 1028 520 L 940 426 L 956 1052 L 1046 1142 Z', fill: '#8fbfb7', opacity: 0.26 },
+      { type: 'path', layer: 'foreground', d: 'M 12 64 L 62 34 L 42 1142', fill: 'none', stroke: 'accent', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.42 },
+      { type: 'path', layer: 'foreground', d: 'M 988 112 L 946 60 L 960 1112', fill: 'none', stroke: 'accent', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.38 },
+      { type: 'path', d: 'M -20 1452 L 188 1468 L 116 1518 L -20 1518 Z', fill: '#b7a8d8', opacity: 0.34 },
+      { type: 'path', d: 'M 1020 1440 L 824 1474 L 902 1524 L 1020 1524 Z', fill: '#9dcbc3', opacity: 0.32 },
+    ],
+  },
+  {
+    id: 'comet-orange',
+    className: 'film-comet-orange',
+    nameKey: 'filmCometName',
+    conditionKey: 'filmCometCondition',
+    unlock: { type: 'achievement', achievement: 'compactArc', target: 1 },
+    paper: { top: '#fff2d2', middle: '#efa257', bottom: '#d47752', accent: '#3a2845' },
+    ink: { primary: '#251b2e', secondary: '#251b2e' },
+    artwork: [
+      { type: 'path', layer: 'foreground', d: 'M -68 1118 C 118 994 130 730 48 470 C 8 342 24 194 90 68', fill: 'none', stroke: 'accent', strokeWidth: 34, strokeLinecap: 'round', opacity: 0.28 },
+      { type: 'path', layer: 'foreground', d: 'M -54 1120 C 122 1000 140 742 60 478 C 22 350 38 210 96 86', fill: 'none', stroke: '#fff3d8', strokeWidth: 8, strokeLinecap: 'round', opacity: 0.72 },
+      { type: 'path', layer: 'foreground', d: 'M 1064 244 C 890 350 894 626 966 822 C 1010 944 1000 1060 936 1160', fill: 'none', stroke: 'accent', strokeWidth: 28, strokeLinecap: 'round', opacity: 0.24 },
+      { type: 'path', d: 'M 242 1346 C 492 1264 764 1272 1028 1184 L 1010 1242 C 754 1322 508 1324 278 1388 Z', fill: '#3a2845', opacity: 0.2 },
+      { type: 'path', d: 'M 278 1350 C 520 1288 744 1290 966 1224', fill: 'none', stroke: '#fff0cd', strokeWidth: 10, strokeLinecap: 'round', opacity: 0.64 },
+      { type: 'rect', layer: 'foreground', cx: 26, cy: 280, width: 42, height: 8, rotation: -18, opacity: 0.52 },
+      { type: 'rect', layer: 'foreground', cx: 28, cy: 330, width: 28, height: 8, rotation: -18, opacity: 0.42 },
+      { type: 'rect', layer: 'foreground', cx: 974, cy: 930, width: 42, height: 8, rotation: 18, opacity: 0.52 },
+      { type: 'rect', layer: 'foreground', cx: 972, cy: 980, width: 28, height: 8, rotation: 18, opacity: 0.42 },
+    ],
+  },
+  {
+    id: 'eclipse-silver',
+    className: 'film-eclipse-silver',
+    nameKey: 'filmEclipseName',
+    conditionKey: 'filmEclipseCondition',
+    unlock: { type: 'achievement', achievement: 'eclipseContrast', target: 1 },
+    paper: { top: '#171923', middle: '#24283b', bottom: '#0d0f16', accent: '#c9d6f2' },
+    ink: { primary: '#f8f5ea', secondary: '#cdd1dd' },
+    artwork: [
+      { type: 'path', layer: 'foreground', d: 'M -124 196 C 92 76 126 396 -18 574', fill: 'none', stroke: 'accent', strokeWidth: 12, strokeLinecap: 'round', opacity: 0.76 },
+      { type: 'path', layer: 'foreground', d: 'M -100 232 C 58 148 82 382 -10 522', fill: 'none', stroke: '#7483a5', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.7 },
+      { type: 'path', layer: 'foreground', d: 'M 1120 574 C 904 438 900 788 1018 982', fill: 'none', stroke: 'accent', strokeWidth: 12, strokeLinecap: 'round', opacity: 0.74 },
+      { type: 'path', layer: 'foreground', d: 'M 1096 614 C 944 518 936 770 1010 930', fill: 'none', stroke: '#7483a5', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.7 },
+      { type: 'rect', layer: 'foreground', cx: 18, cy: 720, width: 30, height: 7, rotation: 0, opacity: 0.52 },
+      { type: 'rect', layer: 'foreground', cx: 18, cy: 770, width: 18, height: 7, rotation: 0, opacity: 0.42 },
+      { type: 'rect', layer: 'foreground', cx: 982, cy: 250, width: 30, height: 7, rotation: 0, opacity: 0.52 },
+      { type: 'rect', layer: 'foreground', cx: 982, cy: 300, width: 18, height: 7, rotation: 0, opacity: 0.42 },
+      { type: 'rect', cx: 120, cy: 1473, width: 44, height: 8, rotation: 0, opacity: 0.34 },
+      { type: 'rect', cx: 288, cy: 1473, width: 26, height: 8, rotation: 0, opacity: 0.24 },
+      { type: 'rect', cx: 500, cy: 1473, width: 58, height: 8, rotation: 0, opacity: 0.38 },
+      { type: 'rect', cx: 712, cy: 1473, width: 26, height: 8, rotation: 0, opacity: 0.24 },
+      { type: 'rect', cx: 880, cy: 1473, width: 44, height: 8, rotation: 0, opacity: 0.34 },
+    ],
+  },
+  {
+    id: 'fourfold-light',
+    className: 'film-fourfold-light',
+    nameKey: 'filmFourfoldName',
+    conditionKey: 'filmFourfoldCondition',
+    unlock: { type: 'distinct-dayparts', target: 3 },
+    paper: { top: '#fcf6e8', middle: '#efe6d3', bottom: '#dbccb2', accent: '#1f2b45' },
+    ink: { primary: '#1f2b45', secondary: '#394760' },
+    artwork: [
+      { type: 'path', layer: 'foreground', d: 'M -22 -18 H 184 C 116 48 84 120 48 252 L -22 300 Z', fill: '#e98c78', opacity: 0.76 },
+      { type: 'path', layer: 'foreground', d: 'M 1022 -18 H 822 C 904 66 934 146 954 294 L 1022 330 Z', fill: '#e6b84a', opacity: 0.78 },
+      { type: 'path', layer: 'foreground', d: 'M 1022 1124 C 942 1052 914 940 950 806 L 1022 760 Z', fill: '#3d8f87', opacity: 0.76 },
+      { type: 'path', layer: 'foreground', d: 'M -22 1138 C 72 1068 90 938 48 820 L -22 782 Z', fill: '#59517d', opacity: 0.78 },
+      { type: 'path', d: 'M 46 1360 C 270 1324 724 1324 954 1360', fill: 'none', stroke: 'accent', strokeWidth: 6, strokeLinecap: 'round', opacity: 0.38 },
+      { type: 'rect', cx: 250, cy: 1346, width: 8, height: 30, rotation: -5, opacity: 0.34 },
+      { type: 'rect', cx: 500, cy: 1338, width: 8, height: 38, rotation: 0, opacity: 0.42 },
+      { type: 'rect', cx: 750, cy: 1346, width: 8, height: 30, rotation: 5, opacity: 0.34 },
+      { type: 'path', d: 'M -16 1450 C 72 1378 148 1390 210 1508 H -16 Z', fill: '#59517d', opacity: 0.3 },
+      { type: 'path', d: 'M 1016 1450 C 928 1378 852 1390 790 1508 H 1016 Z', fill: '#3d8f87', opacity: 0.28 },
+    ],
+  },
 ]
 
 const FILM_BY_ID = new Map(FILMS.map((film) => [film.id, film]))
@@ -144,6 +258,47 @@ function parseColor(value) {
   return rgb.slice(1, 4).map((channel) => Math.max(0, Math.min(255, Number(channel))))
 }
 
+export function getFilmChallengeDaypart(localHour) {
+  if (!Number.isInteger(localHour) || localHour < 0 || localHour > 23) return null
+  if (localHour >= 5 && localHour < 11) return 'morning'
+  if (localHour >= 11 && localHour < 17) return 'day'
+  if (localHour >= 17 && localHour < 23) return 'evening'
+  return 'night'
+}
+
+function hasEclipseContrast(samples = {}) {
+  let darkest = Infinity
+  let brightest = -Infinity
+
+  for (const key of COLOR_KEYS) {
+    const rgb = parseColor(samples[key])
+    if (!rgb || rgb.some((channel) => !Number.isFinite(channel))) return false
+    const { lightness } = rgbToOklch(...rgb)
+    darkest = Math.min(darkest, lightness)
+    brightest = Math.max(brightest, lightness)
+  }
+
+  return darkest <= FILM_CHALLENGE_RULES.eclipseDarkLightness
+    && brightest >= FILM_CHALLENGE_RULES.eclipseBrightLightness
+}
+
+export function createFilmChallenges(day, defaultCaption = '', localHour = new Date().getHours()) {
+  const caption = typeof day?.caption === 'string' ? day.caption.trim() : ''
+  const defaultText = typeof defaultCaption === 'string' ? defaultCaption.trim() : ''
+  const characterCount = Array.from(caption.replace(/\s/gu, '')).length
+  const transparency = day?.composition?.transparency
+  const angle = day?.composition?.angle
+
+  return {
+    version: FILM_CHALLENGE_VERSION,
+    customCaption: caption !== defaultText && characterCount >= FILM_CHALLENGE_RULES.customCaptionCharacters,
+    mistTransparency: Number.isFinite(transparency) && transparency >= FILM_CHALLENGE_RULES.mistTransparency,
+    compactArc: Number.isFinite(angle) && angle >= 10 && angle <= FILM_CHALLENGE_RULES.compactArcDegrees,
+    eclipseContrast: hasEclipseContrast(day?.samples),
+    daypart: getFilmChallengeDaypart(localHour),
+  }
+}
+
 export function isGreenSpectrumColor(value) {
   const rgb = parseColor(value)
   if (!rgb || rgb.some((channel) => !Number.isFinite(channel))) return false
@@ -160,6 +315,28 @@ function countAllGreenRainbows(completedDays) {
   return completedDays.filter((day) => isAllGreenRainbow(day)).length
 }
 
+function getStoredFilmChallenges(day) {
+  const challenges = day?.achievements?.filmChallenges
+  return challenges?.version === FILM_CHALLENGE_VERSION ? challenges : null
+}
+
+function countFilmAchievement(completedDays, achievement) {
+  let count = 0
+  for (const day of completedDays) {
+    if (getStoredFilmChallenges(day)?.[achievement] === true) count += 1
+  }
+  return count
+}
+
+function countDistinctFilmDayparts(completedDays) {
+  const dayparts = new Set()
+  for (const day of completedDays) {
+    const daypart = getStoredFilmChallenges(day)?.daypart
+    if (FILM_DAYPARTS.has(daypart)) dayparts.add(daypart)
+  }
+  return dayparts.size
+}
+
 export function getFilmProgress(film, completedDays = []) {
   const target = film.unlock.target
   let current = 0
@@ -167,6 +344,8 @@ export function getFilmProgress(film, completedDays = []) {
   if (film.unlock.type === 'completed-count') current = completedDates(completedDays).length
   if (film.unlock.type === 'consecutive-days') current = getLongestCompletionStreak(completedDays)
   if (film.unlock.type === 'all-green-rainbow') current = countAllGreenRainbows(completedDays)
+  if (film.unlock.type === 'achievement') current = countFilmAchievement(completedDays, film.unlock.achievement)
+  if (film.unlock.type === 'distinct-dayparts') current = countDistinctFilmDayparts(completedDays)
   if (film.unlock.type === 'always') current = target
 
   return { current: Math.min(current, target), target, met: current >= target }
