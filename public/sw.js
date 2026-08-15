@@ -1,4 +1,4 @@
-const CACHE_NAME = 'niji-diary-shell-v5'
+const CACHE_NAME = 'niji-diary-shell-v6'
 const CACHE_PREFIX = 'niji-diary-shell-'
 const CACHE_TIMEOUT_MS = 3000
 

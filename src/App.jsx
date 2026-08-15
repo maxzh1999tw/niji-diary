@@ -4,12 +4,13 @@ import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { DEFAULT_FILM_ID, FILMS, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
+import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
+import { INFO_PAGE_META, infoContent } from './infoContent.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { importStorageSnapshot, LEGACY_IMPORT_OFFER, LEGACY_IMPORT_READY, LEGACY_IMPORT_RESPONSE, LEGACY_ORIGIN, NEW_APP_ORIGIN, sendLegacyStorageToNewSite } from './migration.js'
 import { COMPLETED_DAY_SCHEMA_VERSION, completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
-const TAB_KEYS = ['today', 'archive', 'films', 'settings']
 const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' }
 const COMPLETED_COLOR_SLOTS = Object.freeze(Object.fromEntries(COLOR_KEYS.map((key) => [key, true])))
 const FILM_PREVIEW_DATE = '2000-01-01'
@@ -41,6 +42,14 @@ function Icon({ name, size = 24 }) {
   if (name === 'check') return <svg {...common}><path d="m5 12 4 4L19 6" /></svg>
   if (name === 'lock') return <svg {...common}><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
   if (name === 'trash') return <svg {...common}><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="m6 7 1 14h10l1-14" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
+  if (name === 'info') return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 11v6" /><path d="M12 7h.01" /></svg>
+  if (name === 'help') return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 1 1 3.5 2.1c-.8.4-1.3 1-1.3 1.9" /><path d="M12 17h.01" /></svg>
+  if (name === 'shield') return <svg {...common}><path d="M12 3 4.5 6v5.5c0 4.7 3.2 8 7.5 9.5 4.3-1.5 7.5-4.8 7.5-9.5V6Z" /><path d="m9 12 2 2 4-4" /></svg>
+  if (name === 'document') return <svg {...common}><path d="M6 3h8l4 4v14H6Z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h6" /></svg>
+  if (name === 'mail') return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
+  if (name === 'cookie') return <svg {...common}><path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a4 4 0 0 0 4.7 4.7 4 4 0 0 0 5 5Z" /><circle cx="8.5" cy="9" r=".7" fill="currentColor" stroke="none" /><circle cx="9.5" cy="15" r=".7" fill="currentColor" stroke="none" /><circle cx="15" cy="16" r=".7" fill="currentColor" stroke="none" /></svg>
+  if (name === 'external') return <svg {...common}><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" /></svg>
+  if (name === 'chevron') return <svg {...common}><path d="m9 18 6-6-6-6" /></svg>
   return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>
 }
 
@@ -97,11 +106,14 @@ function formatDate(date, lang, compact = false) {
   return new Intl.DateTimeFormat(locale, compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00`))
 }
 
-function resetAppViewport() {
+function resetAppViewport(focusMain = false) {
   requestAnimationFrame(() => {
     window.scrollTo(0, 0)
     const environment = document.querySelector('.app-environment')
     if (environment) environment.scrollTop = 0
+    const screen = document.querySelector('.app-content > section')
+    if (screen) screen.scrollTop = 0
+    if (focusMain) document.querySelector('#app-content')?.focus({ preventScroll: true })
   })
 }
 
@@ -1373,7 +1385,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm }) {
   </section>
 }
 
-function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, onMigrate }) {
+function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, onMigrate, onOpenInfo }) {
   const migrationBusy = migrationState.status === 'sending'
   const migrationStatus = migrationState.status === 'success'
     ? formatText(t.migrationSuccess, {
@@ -1405,9 +1417,54 @@ function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, on
         <button className="y2k-button migration-button" type="button" onClick={onMigrate} disabled={migrationBusy}><Icon name={migrationBusy ? 'sparkle' : 'upload'} size={19} />{migrationBusy ? t.migrationSending : t.migrationButton}</button>
       </div> : null}
       <div className="settings-card info-card"><Icon name="lock" /><div><strong>{t.privateTitle}</strong><p>{t.privateHint}</p></div></div>
+      <section className="settings-info-center" aria-labelledby="info-center-title">
+        <div className="settings-section-heading">
+          <span className="chrome-kicker">INFO CENTER</span>
+          <h2 id="info-center-title">{t.infoCenterTitle}</h2>
+          <p>{t.infoCenterHint}</p>
+        </div>
+        <div className="info-link-grid">
+          {INFO_PAGE_META.map(({ key, icon }) => <button type="button" key={key} onClick={() => onOpenInfo(key)}>
+            <span className={`info-link-icon info-link-${key}`}><Icon name={icon} size={23} /></span>
+            <strong>{infoContent[lang][key].label}</strong>
+            <Icon name="chevron" size={19} />
+          </button>)}
+        </div>
+      </section>
       <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v2.0 · Y2K EDITION</small></div>
     </section>
   )
+}
+
+function InfoScreen({ pageKey, lang, t, onBack, onNavigate }) {
+  const page = infoContent[lang][pageKey]
+  if (!page) return null
+
+  return <section className="info-screen screen-enter" aria-labelledby="info-page-title">
+    <div className="info-page-shell">
+      <button className="info-back-button" type="button" onClick={onBack}><Icon name="back" size={21} />{t.backToSettings}</button>
+      <article className="info-article">
+        <header className="info-hero">
+          <span className="chrome-kicker">{page.kicker}</span>
+          <h1 id="info-page-title">{page.label}</h1>
+          {page.status ? <strong className="info-status"><span aria-hidden="true" />{page.status}</strong> : null}
+          <p>{page.summary}</p>
+          {page.updated ? <small>{page.updated}</small> : null}
+        </header>
+        <div className="info-article-body">
+          {page.sections.map((section, index) => <section key={`${pageKey}-${index}`}>
+            <h2>{section.title}</h2>
+            {section.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            {section.bullets ? <ul>{section.bullets.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+            {section.links?.length ? <div className="info-resource-links" aria-label={t.relatedLinks}>{section.links.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noreferrer">{link.label}<span className="visually-hidden">（{t.externalLink}）</span><Icon name="external" size={17} /></a>)}</div> : null}
+          </section>)}
+        </div>
+      </article>
+      <nav className="info-page-nav" aria-label={t.infoNavigation}>
+        {INFO_PAGE_META.map(({ key, icon }) => <button type="button" key={key} className={pageKey === key ? 'active' : ''} aria-current={pageKey === key ? 'page' : undefined} onClick={() => onNavigate(key)}><Icon name={icon} size={19} /><span>{infoContent[lang][key].label}</span></button>)}
+      </nav>
+    </div>
+  </section>
 }
 
 function RainbowModal({ day, lang, t, exporting, onClose, onSave, onShare, onCaptionChange, onCaptionCommit }) {
@@ -1486,7 +1543,8 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
 
 export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('niji-language') || 'zh-Hant')
-  const [activeTab, setActiveTab] = useState(() => TAB_KEYS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'today')
+  const [activeTab, setActiveTab] = useState(() => parseAppHash(location.hash).tab)
+  const [infoPage, setInfoPage] = useState(() => parseAppHash(location.hash).infoPage)
   const [day, setDay] = useState(null)
   const [dailyLocked, setDailyLocked] = useState(false)
   const [history, setHistory] = useState([])
@@ -1596,6 +1654,11 @@ export default function App() {
   }, [lang])
 
   useEffect(() => {
+    const pageTitle = infoPage ? infoContent[lang][infoPage]?.label : null
+    document.title = pageTitle ? `${pageTitle} · ${t.brand}` : `${t.brand} · Niji Diary`
+  }, [infoPage, lang, t.brand])
+
+  useEffect(() => {
     const syncDate = () => setDate(localDateKey())
     const handleVisibilityChange = () => { if (document.visibilityState === 'visible') syncDate() }
     const interval = window.setInterval(syncDate, 60_000)
@@ -1607,7 +1670,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const syncHash = () => { const next = location.hash.slice(1); if (TAB_KEYS.includes(next)) setActiveTab(next) }
+    const syncHash = () => {
+      const route = parseAppHash(location.hash)
+      setActiveTab(route.tab)
+      setInfoPage(route.infoPage)
+      resetAppViewport(true)
+    }
     window.addEventListener('hashchange', syncHash)
     if (!location.hash) window.history.replaceState(null, '', '#today')
     return () => window.removeEventListener('hashchange', syncHash)
@@ -1665,8 +1733,24 @@ export default function App() {
     setSamplerOpen(false)
     setComposing(false)
     setActiveTab(tab)
+    setInfoPage(null)
     location.hash = tab
-    resetAppViewport()
+    resetAppViewport(true)
+  }
+
+  function navigateInfo(page) {
+    if (!INFO_PAGE_KEYS.includes(page)) return
+    setActiveTab('settings')
+    setInfoPage(page)
+    location.hash = infoHash(page)
+    resetAppViewport(true)
+  }
+
+  function closeInfo() {
+    setActiveTab('settings')
+    setInfoPage(null)
+    location.hash = 'settings'
+    resetAppViewport(true)
   }
 
   function selectFilm(filmId) {
@@ -1861,12 +1945,14 @@ export default function App() {
     resetAppViewport()
   }
 
-  const screen = activeTab === 'archive'
+  const screen = infoPage
+    ? <InfoScreen pageKey={infoPage} lang={lang} t={t} onBack={closeInfo} onNavigate={navigateInfo} />
+    : activeTab === 'archive'
     ? <ArchiveScreen history={history} lang={lang} t={t} onOpen={setSelectedDay} onRequestDelete={requestDeletePolaroid} />
     : activeTab === 'films'
       ? <FilmsScreen completedDays={history} filmCollection={filmCollection} lang={lang} t={t} onSelectFilm={selectFilm} />
       : activeTab === 'settings'
-      ? <SettingsScreen lang={lang} setLang={setLang} t={t} migrationEnabled={location.origin === LEGACY_ORIGIN} migrationState={migrationState} onMigrate={handleLegacyMigration} />
+      ? <SettingsScreen lang={lang} setLang={setLang} t={t} migrationEnabled={location.origin === LEGACY_ORIGIN} migrationState={migrationState} onMigrate={handleLegacyMigration} onOpenInfo={navigateInfo} />
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
@@ -1878,7 +1964,7 @@ export default function App() {
   return <div className="app-environment">
     <div className="ambient-bubble bubble-one" /><div className="ambient-bubble bubble-two" />
     <div className={`app-shell ${immersiveEditor ? 'immersive-editor' : ''}`}>
-      <a className="skip-link" href="#app-content">{t.skip}</a>
+      <a className="skip-link" href="#app-content" onClick={(event) => { event.preventDefault(); document.querySelector('#app-content')?.focus() }}>{t.skip}</a>
       {!immersiveEditor ? <header className="app-header"><button className="app-logo" type="button" onClick={() => navigate('today')} aria-label={t.brand}><img className="app-brand-mark" src="./logo.svg" alt="" aria-hidden="true" /><span><b>NIJI</b><small>{t.brand}</small></span></button></header> : null}
       <main id="app-content" className="app-content" tabIndex="-1">{screen}</main>
       {!immersiveEditor ? <nav className="bottom-nav" aria-label={t.mainNavigation}>{TAB_KEYS.map((key) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => navigate(key)}><Icon name={key === 'today' ? 'camera' : key === 'archive' ? 'book' : key === 'films' ? 'film' : 'gear'} /><span>{t.tabs[key]}</span></button>)}</nav> : null}
