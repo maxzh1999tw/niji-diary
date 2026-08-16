@@ -313,6 +313,31 @@ export function createFilmChallenges(day, defaultCaption = '') {
   }
 }
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function ensureCustomCaptionChallenge(day, defaultCaption = '') {
+  if (!createFilmChallenges(day, defaultCaption).customCaption) return day
+
+  const achievements = isRecord(day?.achievements) ? day.achievements : {}
+  const existingChallenges = isRecord(achievements.filmChallenges) ? achievements.filmChallenges : {}
+  if (existingChallenges.version !== undefined && existingChallenges.version !== FILM_CHALLENGE_VERSION) return day
+  if (existingChallenges.version === FILM_CHALLENGE_VERSION && existingChallenges.customCaption === true) return day
+
+  return {
+    ...day,
+    achievements: {
+      ...achievements,
+      filmChallenges: {
+        ...existingChallenges,
+        version: FILM_CHALLENGE_VERSION,
+        customCaption: true,
+      },
+    },
+  }
+}
+
 export function isGreenSpectrumColor(value) {
   const rgb = parseColor(value)
   if (!rgb || rgb.some((channel) => !Number.isFinite(channel))) return false

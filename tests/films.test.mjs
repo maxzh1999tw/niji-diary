@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { COLOR_KEYS } from '../src/colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, isAllGreenRainbow, normalizeFilmCollection } from '../src/films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, ensureCustomCaptionChallenge, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, isAllGreenRainbow, normalizeFilmCollection } from '../src/films.js'
 import { translations } from '../src/i18n.js'
 
 const completed = (date, overrides = {}) => ({ date, completedAt: `${date}T12:00:00.000Z`, photos: {}, samples: {}, ...overrides })
@@ -27,9 +27,9 @@ for (const language of Object.values(translations)) {
   assert.doesNotMatch(newConditions, /OKLCH/, 'new film conditions must avoid invisible technical calculations')
   assert.match(language[getFilm('threefold-light').conditionKey], /05:00.*10:59.*11:00.*16:59.*17:00.*04:59/, 'threefold light must explain every time boundary')
 }
-assert.equal(translations['zh-Hant'].filmLetterpressCondition, '在製作拍立得時修改下方的預設文字，改成自己的話。')
-assert.match(translations.en.filmLetterpressCondition, /While making a Polaroid/)
-assert.match(translations.ja.filmLetterpressCondition, /作成中/)
+assert.equal(translations['zh-Hant'].filmLetterpressCondition, '修改拍立得下方的預設文字，改成自己的話。')
+assert.match(translations.en.filmLetterpressCondition, /below any Polaroid/)
+assert.doesNotMatch(translations.ja.filmLetterpressCondition, /作成中/)
 
 const firstPolaroid = [completed('2026-08-01')]
 assert.equal(getFilmProgress(FILMS[1], firstPolaroid).met, true)
@@ -67,6 +67,14 @@ assert.equal(baseChallenges.daypart, 'midday')
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: '我' }, 'NIJI 拾色日記').customCaption, true, 'any real custom caption is understandable and sufficient')
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: '   ' }, 'NIJI 拾色日記').customCaption, false)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, caption: 'NIJI 拾色日記' }, 'NIJI 拾色日記').customCaption, false)
+const retroactiveCaptionRecord = { date: '2026-08-06', caption: '相冊裡已寫好的話', completedAt: localCompletedAt(12), achievements: { allGreenRainbow: true, keepMe: 'yes' } }
+const repairedCaptionRecord = ensureCustomCaptionChallenge(retroactiveCaptionRecord, 'NIJI 拾色日記')
+assert.equal(repairedCaptionRecord.achievements.filmChallenges.customCaption, true)
+assert.equal(repairedCaptionRecord.achievements.filmChallenges.version, FILM_CHALLENGE_VERSION)
+assert.equal(repairedCaptionRecord.achievements.keepMe, 'yes', 'caption repair must preserve unrelated achievement data')
+assert.equal(getFilmProgress(getFilm('letterpress-ochre'), [repairedCaptionRecord]).met, true)
+const defaultCaptionRecord = { ...retroactiveCaptionRecord, caption: 'NIJI 拾色日記' }
+assert.equal(ensureCustomCaptionChallenge(defaultCaptionRecord, 'NIJI 拾色日記'), defaultCaptionRecord)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, transparency: 0.54 } }, '').mistTransparency, false)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, transparency: 0.55 } }, '').mistTransparency, true)
 assert.equal(createFilmChallenges({ ...baseChallengeDay, composition: { ...baseChallengeDay.composition, angle: 61 } }, '').compactArc, false)

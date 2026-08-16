@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
 import { formatText, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
@@ -311,15 +311,27 @@ async function compactCompletedHistory(completedDays, lang, fallbackCaption) {
   return compactedDays
 }
 
+async function backfillCaptionChallenges(completedDays, defaultCaption) {
+  const updatedDays = completedDays.map((day) => ensureCustomCaptionChallenge(day, defaultCaption))
+  const changedDays = updatedDays.filter((day, index) => day !== completedDays[index])
+  await Promise.all(changedDays.map(async (day) => {
+    try { await saveDay(day) } catch { /* keep the in-memory repair; the next load can retry it */ }
+  }))
+  return updatedDays
+}
+
 async function hydrateCollectionState(date, lang) {
   const { completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection } = await loadCollectionState(date)
   const compactedDays = await compactCompletedHistory(completedDays, lang, translations[lang].defaultCaption)
-  const completedToday = compactedDays.find((item) => item.date === date) ?? null
+  const repairedDays = await backfillCaptionChallenges(compactedDays, translations[lang].defaultCaption)
+  const normalizedFilmCollection = normalizeFilmCollection(savedFilmCollection, repairedDays)
+  const hydratedFilmCollection = withoutFilmCollectionMeta(normalizedFilmCollection)
+  if (normalizedFilmCollection.needsSave) await saveFilmCollection(hydratedFilmCollection)
+  const completedToday = repairedDays.find((item) => item.date === date) ?? null
   const savedDay = completedToday ?? draft
-  const hydratedFilmCollection = withoutFilmCollectionMeta(savedFilmCollection ?? normalizeFilmCollection(null, compactedDays))
   const pendingFilmId = readPendingFilmSelection()
   const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
-    ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, compactedDays))
+    ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, repairedDays))
     : hydratedFilmCollection
 
   if (pendingFilmId) {
@@ -333,7 +345,7 @@ async function hydrateCollectionState(date, lang) {
   return {
     day: savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft(),
     dailyLocked: savedDailyLock,
-    history: compactedDays,
+    history: repairedDays,
     filmCollection: recoveredFilmCollection,
   }
 }
@@ -877,6 +889,7 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
 
 function ComposeScreen({ background, photos, samples, caption, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onCaptionChange, onCaptionCommit, onSelectFilm, onCapture, onBack, onFinish, finishing }) {
   const [activeTool, setActiveTool] = useState('transparency')
+  const latestCaption = useRef(caption)
   const pointers = useRef(new Map())
   const gesture = useRef(null)
   const liveTransform = useRef(transform)
@@ -885,6 +898,10 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
   useEffect(() => {
     if (renderFrame.current === null) liveTransform.current = transform
   }, [transform])
+
+  useEffect(() => {
+    latestCaption.current = caption
+  }, [caption])
 
   useEffect(() => () => {
     if (renderFrame.current !== null) cancelAnimationFrame(renderFrame.current)
@@ -982,10 +999,21 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
   const captionChallengeFilm = challengeFilms.find((film) => film.challengeTool === 'caption')
   const activeChallengeFilm = challengeFilms.find((film) => film.challengeTool === activeTool)
   const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
+  function handleCaptionChange(nextCaption) {
+    latestCaption.current = nextCaption
+    onCaptionChange(nextCaption)
+  }
+  function handleCaptionCommit(nextCaption) {
+    latestCaption.current = nextCaption
+    onCaptionCommit(nextCaption)
+  }
+  function finishWithLatestCaption() {
+    onFinish(latestCaption.current)
+  }
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
-    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={onFinish}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
+    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onFocus={captionChallengeFilm ? () => setActiveTool('caption') : undefined} onChange={onCaptionChange} onCommit={onCaptionCommit} /></PolaroidCard></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onFocus={captionChallengeFilm ? () => setActiveTool('caption') : undefined} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} challengeFilms={challengeFilms} challengeResults={challengeResults} lang={lang} t={t} onSelect={onSelectFilm} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
         {activeChallengeFilm ? <FilmChallengeStatus film={activeChallengeFilm} met={challengeResults[activeChallengeFilm.unlock.achievement] === true} t={t} /> : null}
@@ -1860,7 +1888,7 @@ export default function App() {
     finally { setProcessing(false); if (input) input.value = '' }
   }
 
-  async function finishRainbowCard() {
+  async function finishRainbowCard(captionOverride) {
     if (!background || finishing || count !== 7 || dailyLocked) return
     setFinishing(true)
     try {
@@ -1868,7 +1896,8 @@ export default function App() {
       const completionTime = new Date()
       const filmId = filmCollection.selectedFilmId || DEFAULT_FILM_ID
       const film = getFilm(filmId)
-      const completionSource = { ...day, date, cardImage, filmId, caption: day.caption ?? t.defaultCaption, composition: rainbowTransform, completedAt: completionTime.toISOString() }
+      const caption = typeof captionOverride === 'string' ? captionOverride : (day.caption ?? t.defaultCaption)
+      const completionSource = { ...day, date, cardImage, filmId, caption, composition: rainbowTransform, completedAt: completionTime.toISOString() }
       const renderSource = {
         ...completionSource,
         ...(film.ink?.primary ? { captionInk: film.ink.primary } : {}),
@@ -1960,10 +1989,35 @@ export default function App() {
     catch { showMessage(t.error) }
   }
 
-  async function persistCaption(target) {
+  async function persistCaption(target, caption = target?.caption) {
     if (!target) return
-    try { await saveDay(target); showMessage(t.captionSaved) }
-    catch { showMessage(t.error) }
+    const nextTarget = ensureCustomCaptionChallenge({ ...target, caption }, t.defaultCaption)
+    const nextHistory = history.some((item) => item?.date === nextTarget.date)
+      ? history.map((item) => item?.date === nextTarget.date ? nextTarget : item)
+      : [nextTarget, ...history]
+    const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection(filmCollection, nextHistory))
+    const nextFilmNotifications = getFilmProgressChanges(history, nextHistory)
+      .filter((notification) => !filmCollection.unlockedFilmIds.includes(notification.filmId))
+      .map((notification) => ({ ...notification, id: `${nextTarget.completedAt ?? nextTarget.date}-${notification.filmId}` }))
+    const filmCollectionChanged = filmCollection.selectedFilmId !== nextFilmCollection.selectedFilmId
+      || filmCollection.unlockedFilmIds.length !== nextFilmCollection.unlockedFilmIds.length
+      || filmCollection.unlockedFilmIds.some((filmId, index) => filmId !== nextFilmCollection.unlockedFilmIds[index])
+    try { await saveDay(nextTarget) }
+    catch { showMessage(t.error); return }
+
+    const updateCurrentDay = (current) => current?.date === nextTarget.date ? nextTarget : current
+    setDay(updateCurrentDay)
+    setHistory(nextHistory)
+    setSelectedDay(updateCurrentDay)
+    setDevelopedDay(updateCurrentDay)
+    setFilmCollection(nextFilmCollection)
+    if (nextFilmNotifications.length) setFilmNotifications((current) => [...current, ...nextFilmNotifications])
+
+    if (filmCollectionChanged) {
+      try { await saveFilmCollection(nextFilmCollection) }
+      catch { showMessage(t.error); return }
+    }
+    showMessage(t.captionSaved)
   }
 
   function requestDeletePolaroid(target) {
@@ -2029,9 +2083,9 @@ export default function App() {
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
     {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
-    <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={() => persistCaption(selectedDay)} />
+    <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(selectedDay, caption)} />
     <DeletePolaroidDialog day={pendingDelete} lang={lang} t={t} deleting={deletingPolaroid} onCancel={() => { if (!deletingPolaroid) setPendingDelete(null) }} onConfirm={confirmDeletePolaroid} />
-    <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={() => persistCaption(developedDay)} />
+    <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(developedDay, caption)} />
     {filmNotifications[0] ? <FilmProgressBookmark key={filmNotifications[0].id} notification={filmNotifications[0]} lang={lang} t={t} offsetForNavigation={!immersiveEditor} onDismiss={() => setFilmNotifications((current) => current.slice(1))} /> : null}
   </div>
 }
