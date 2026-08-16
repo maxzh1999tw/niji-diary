@@ -525,19 +525,17 @@ img { max-width: 100%; }
   padding: 0;
   border: 0;
   border-radius: inherit;
-  background: rgba(0, 219, 234, .04);
-  box-shadow: inset 0 0 0 4px var(--cyan), inset 0 0 0 7px rgba(255, 255, 255, .82);
+  background: transparent;
   cursor: crosshair;
   touch-action: manipulation;
 }
 
 .polaroid-eyedropper-target:focus-visible {
-  outline: 4px solid var(--cyan);
-  outline-offset: -7px;
+  outline: none;
+  box-shadow: none;
 }
 
 .polaroid-eyedropper-target.is-busy {
-  background: rgba(0, 219, 234, .12);
   cursor: progress;
 }
 
