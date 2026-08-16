@@ -4,7 +4,7 @@ import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { createFilmChallenges, DEFAULT_FILM_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
 import { getFilmRenderModel, getPolaroidLayoutStyle, scopeFilmRenderSvg } from './filmRendering.js'
 import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
-import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
+import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
 import { formatText, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
 import { INFO_PAGE_META, infoContent } from './infoContent.js'
@@ -32,6 +32,7 @@ function Icon({ name, size = 24 }) {
   if (name === 'camera') return <svg {...common}><path d="M14.5 5 13 3H7L5.5 5H3a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-6.5Z" /><circle cx="10" cy="12" r="4" /></svg>
   if (name === 'upload') return <svg {...common}><path d="M12 16V3" /><path d="m7 8 5-5 5 5" /><path d="M5 13H3v8h18v-8h-2" /></svg>
   if (name === 'palette') return <svg {...common}><path d="M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 0-4H12a1.5 1.5 0 0 1 0-3h2a7 7 0 0 0 0-14Z" /><circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="9.5" cy="6.5" r="1" fill="currentColor" stroke="none" /><circle cx="14" cy="6" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9" r="1" fill="currentColor" stroke="none" /></svg>
+  if (name === 'eyedropper') return <svg {...common}><path d="m19 3 2 2-9.5 9.5-3-3Z" /><path d="m14.5 8.5 3 3" /><path d="m10 13-5.5 5.5L3 22l3.5-1.5L12 15" /></svg>
   if (name === 'opacity') return <svg {...common}><path d="M12 3s6 6.1 6 11a6 6 0 0 1-12 0c0-4.9 6-11 6-11Z" /><path d="M8.5 15.5a3.5 3.5 0 0 0 7 0" /></svg>
   if (name === 'radius') return <svg {...common}><path d="M4 18A10 10 0 0 1 20 18" /><path d="M12 18V8" /><path d="m9 11 3-3 3 3" /></svg>
   if (name === 'width') return <svg {...common}><path d="M4 8h16" /><path d="M4 16h16" /><path d="M8 5v6" /><path d="M16 13v6" /></svg>
@@ -386,6 +387,21 @@ function sampleSourcePhoto(image, point) {
   return { ...analysis, samplePoint: point, pixel: { x, y } }
 }
 
+async function sampleImageSourceColor(source, point) {
+  const image = await loadImageSource(source)
+  const sourceWidth = image.naturalWidth || image.width
+  const sourceHeight = image.naturalHeight || image.height
+  const x = Math.max(0, Math.min(sourceWidth - 1, Math.floor(point.x * sourceWidth)))
+  const y = Math.max(0, Math.min(sourceHeight - 1, Math.floor(point.y * sourceHeight)))
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  context.drawImage(image, x, y, 1, 1, 0, 0, 1, 1)
+  const [red, green, blue] = context.getImageData(0, 0, 1, 1).data
+  return rgbToHex(red, green, blue)
+}
+
 async function renderComposite(background, samples, transform) {
   const image = await loadImageSource(background)
   const canvas = document.createElement('canvas')
@@ -612,13 +628,42 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
 function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
   const selectedFilm = getFilm(selectedFilmId)
   const availableFilms = FILMS.filter((film) => unlockedFilmIds.includes(film.id))
+  const [scrolling, setScrolling] = useState(false)
+  const scrollIntent = useRef(false)
+  const scrollTimer = useRef(null)
+
+  useEffect(() => () => window.clearTimeout(scrollTimer.current), [])
+
+  function prepareFilmScroll() {
+    scrollIntent.current = true
+    window.clearTimeout(scrollTimer.current)
+    scrollTimer.current = window.setTimeout(() => {
+      scrollIntent.current = false
+      setScrolling(false)
+    }, 800)
+  }
+
+  function revealFilmScrollbar() {
+    if (!scrollIntent.current) return
+    setScrolling(true)
+    window.clearTimeout(scrollTimer.current)
+    scrollTimer.current = window.setTimeout(() => {
+      scrollIntent.current = false
+      setScrolling(false)
+    }, 650)
+  }
+
+  function prepareKeyboardScroll(event) {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) prepareFilmScroll()
+  }
+
   return <section className="film-picker" aria-labelledby="film-picker-title">
     <span className="visually-hidden" id="film-picker-hint">{t.filmPickerHint}</span>
     <div className="film-picker-heading">
       <div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></div>
       <span className="film-picker-current">{t[selectedFilm.nameKey]}</span>
     </div>
-    <div className="film-picker-options" id="film-picker-options" role="group" aria-label={t.filmPickerLabel} aria-describedby="film-picker-hint">
+    <div className={`film-picker-options ${scrolling ? 'is-scrolling' : ''}`} id="film-picker-options" role="group" aria-label={t.filmPickerLabel} aria-describedby="film-picker-hint" onPointerDown={prepareFilmScroll} onWheel={prepareFilmScroll} onKeyDown={prepareKeyboardScroll} onScroll={revealFilmScrollbar}>
       {availableFilms.map((film) => {
         const selected = selectedFilm.id === film.id
         return <button type="button" key={film.id} className={`film-option ${film.className} ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={() => onSelect(film.id)}>
@@ -631,7 +676,7 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
   </section>
 }
 
-function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
+function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, samples, labels, date, dateLabel, lang, filmId, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
   const filmStyle = {
     ...getPolaroidLayoutStyle(),
@@ -639,7 +684,7 @@ function PolaroidCard({ image, alt, media, overlay, photos, samples, labels, dat
     '--film-ink': film.ink?.primary ?? DEFAULT_FILM_INK,
     '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
   }
-  return <div className={`polaroid-card ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div></div>
+  return <div className={`polaroid-card ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} /><div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div><PolaroidSourceStrip photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div>{interactionOverlay}</div>
 }
 
 function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
@@ -876,13 +921,14 @@ function TodayScreen({ day, count, date, lang, t, loading, dailyLocked, onCaptur
   )
 }
 
-function SolidBackgroundPicker({ selectedColor, t, onSelect, onClose }) {
+function SolidBackgroundPicker({ selectedColor, canPickFromPolaroid, t, onSelect, onStartEyedropper, onClose }) {
   const [customOpen, setCustomOpen] = useState(false)
   const [hue, setHue] = useState(200)
   const [saturation, setSaturation] = useState(68)
   const [lightness, setLightness] = useState(84)
   const dialogRef = useRef(null)
   const customColor = hslToHex(hue, saturation, lightness)
+  const rangeHueColor = `hsl(${hue} 100% 50%)`
   const normalizedSelectedColor = normalizeSolidBackgroundColor(selectedColor)
 
   useEffect(() => {
@@ -902,21 +948,28 @@ function SolidBackgroundPicker({ selectedColor, t, onSelect, onClose }) {
       <header><div><span className="chrome-kicker">BACKGROUND COLOR</span><h2 id="solid-picker-title">{t.solidPickerTitle}</h2></div><button className="solid-picker-close" type="button" onClick={onClose} aria-label={t.close}>×</button></header>
       <p>{t.solidPickerHint}</p>
       <div className="solid-preset-grid" role="group" aria-label={t.solidPresetColors}>{SOLID_BACKGROUND_PRESETS.map(({ color, labelKey }) => <button type="button" key={color} className="solid-preset" style={{ '--solid-preview': color }} aria-label={t[labelKey]} aria-pressed={normalizedSelectedColor === color} onClick={() => onSelect(color)} />)}</div>
-      <button className={`custom-color-toggle ${customOpen ? 'active' : ''}`} type="button" aria-expanded={customOpen} aria-controls="custom-color-controls" onClick={() => setCustomOpen((current) => !current)}><Icon name="palette" />{t.customColor}</button>
+      <div className="solid-picker-mode-actions">
+        <button className={`custom-color-toggle ${customOpen ? 'active' : ''}`} type="button" aria-expanded={customOpen} aria-controls="custom-color-controls" onClick={() => setCustomOpen((current) => !current)}><Icon name="palette" />{t.customColor}</button>
+        <button className="eyedropper-toggle" type="button" disabled={!canPickFromPolaroid} onClick={onStartEyedropper}><Icon name="eyedropper" />{t.pickColor}</button>
+      </div>
+      {!canPickFromPolaroid ? <p className="eyedropper-unavailable">{t.pickColorNeedsBackground}</p> : null}
       {customOpen ? <div id="custom-color-controls" className="custom-color-controls">
         <div className="custom-color-preview" style={{ '--custom-preview': customColor }}><span>{customColor}</span></div>
         <label><span>{t.colorHue}<output>{hue}°</output></span><input className="hue-range" type="range" min="0" max="359" value={hue} onChange={(event) => setHue(Number(event.target.value))} /></label>
-        <label><span>{t.colorSaturation}<output>{saturation}%</output></span><input className="saturation-range" type="range" min="0" max="100" value={saturation} style={{ '--range-color': `hsl(${hue} ${saturation}% 50%)` }} onChange={(event) => setSaturation(Number(event.target.value))} /></label>
-        <label><span>{t.colorLightness}<output>{lightness}%</output></span><input className="lightness-range" type="range" min="5" max="95" value={lightness} style={{ '--range-color': customColor }} onChange={(event) => setLightness(Number(event.target.value))} /></label>
+        <label><span>{t.colorSaturation}<output>{saturation}%</output></span><input className="saturation-range" type="range" min="0" max="100" value={saturation} style={{ '--range-color': rangeHueColor }} onChange={(event) => setSaturation(Number(event.target.value))} /></label>
+        <label><span>{t.colorLightness}<output>{lightness}%</output></span><input className="lightness-range" type="range" min="5" max="95" value={lightness} style={{ '--range-color': rangeHueColor }} onChange={(event) => setLightness(Number(event.target.value))} /></label>
         <button className="apply-custom-color" type="button" onClick={() => onSelect(customColor)}><Icon name="check" />{t.applyColor}</button>
       </div> : null}
     </section>
   </div>
 }
 
-function ComposeScreen({ background, solidBackgroundColor, photos, samples, caption, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onCaptionChange, onCaptionCommit, onSelectFilm, onCapture, onSelectSolidBackground, onBack, onFinish, finishing }) {
+function ComposeScreen({ background, solidBackgroundColor, photos, samples, caption, date, transform, setTransform, selectedFilmId, unlockedFilmIds, lang, t, onCaptionChange, onCaptionCommit, onSelectFilm, onCapture, onSelectSolidBackground, onPickPolaroidColor, onBack, onFinish, finishing }) {
   const [activeTool, setActiveTool] = useState('transparency')
   const [solidPickerOpen, setSolidPickerOpen] = useState(false)
+  const [eyedropperActive, setEyedropperActive] = useState(false)
+  const [eyedropperBusy, setEyedropperBusy] = useState(false)
+  const eyedropperTargetRef = useRef(null)
   const latestCaption = useRef(caption)
   const pointers = useRef(new Map())
   const gesture = useRef(null)
@@ -934,6 +987,16 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
   useEffect(() => () => {
     if (renderFrame.current !== null) cancelAnimationFrame(renderFrame.current)
   }, [])
+
+  useEffect(() => {
+    if (!eyedropperActive) return undefined
+    requestAnimationFrame(() => eyedropperTargetRef.current?.focus())
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !eyedropperBusy) setEyedropperActive(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [eyedropperActive, eyedropperBusy])
 
   function queueTransform(next) {
     liveTransform.current = next
@@ -1043,10 +1106,34 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     onSelectSolidBackground(color)
     setSolidPickerOpen(false)
   }
+  function startEyedropper() {
+    setSolidPickerOpen(false)
+    setEyedropperActive(true)
+  }
+  async function pickPolaroidColor(event) {
+    if (eyedropperBusy) return
+    const frame = event.currentTarget.getBoundingClientRect()
+    const point = event.detail === 0
+      ? { x: 0.5, y: 0.5 }
+      : {
+        x: Math.max(0, Math.min(1, (event.clientX - frame.left) / frame.width)),
+        y: Math.max(0, Math.min(1, (event.clientY - frame.top) / frame.height)),
+      }
+    setEyedropperBusy(true)
+    try {
+      const color = await onPickPolaroidColor(point)
+      if (color) {
+        onSelectSolidBackground(color)
+        setEyedropperActive(false)
+      }
+    } finally {
+      setEyedropperBusy(false)
+    }
+  }
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
-    <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
+    <header className="studio-topbar"><button className="icon-button" type="button" onClick={eyedropperActive ? () => setEyedropperActive(false) : onBack} aria-label={eyedropperActive ? t.cancelPickColor : t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{eyedropperActive ? t.pickColorTitle : background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? eyedropperActive ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={eyedropperBusy} onClick={() => setEyedropperActive(false)}><Icon name="back" size={18} />{t.cancelPickColor}</button></div> : <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p className="studio-next-step">{t.studioNextStep}</p><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label><button className="background-source solid-source" type="button" onClick={() => setSolidPickerOpen(true)}><Icon name="palette" /><span><b>{t.chooseSolidBackground}</b><small>{t.solidBackgroundHint}</small></span></button></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div></>} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => updateEditorValue(activeControl.key, Number(event.target.value))} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => {
@@ -1054,7 +1141,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
         })}</div>
       </div>
     </div>}
-    {solidPickerOpen ? <SolidBackgroundPicker selectedColor={solidBackgroundColor} t={t} onSelect={selectSolidBackground} onClose={() => setSolidPickerOpen(false)} /> : null}
+    {solidPickerOpen ? <SolidBackgroundPicker selectedColor={solidBackgroundColor} canPickFromPolaroid={Boolean(background)} t={t} onSelect={selectSolidBackground} onStartEyedropper={startEyedropper} onClose={() => setSolidPickerOpen(false)} /> : null}
   </section>
 }
 
@@ -1934,6 +2021,25 @@ export default function App() {
     navigator.vibrate?.(25)
   }
 
+  async function handlePickPolaroidColor(point) {
+    if (!background || !day) return null
+    try {
+      const filmId = filmCollection.selectedFilmId || DEFAULT_FILM_ID
+      const cardImage = await renderComposite(background, day.samples ?? {}, rainbowTransform)
+      const polaroidImage = await renderPolaroidImage({
+        ...day,
+        date,
+        cardImage,
+        filmId,
+        caption: day.caption ?? t.defaultCaption,
+      }, lang, t.defaultCaption)
+      return await sampleImageSourceColor(polaroidImage, point)
+    } catch {
+      showMessage(t.photoError)
+      return null
+    }
+  }
+
   async function finishRainbowCard(captionOverride) {
     if (!background || finishing || count !== 7 || dailyLocked) return
     setFinishing(true)
@@ -2112,7 +2218,7 @@ export default function App() {
       : staged
         ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
-          ? <ComposeScreen background={background} solidBackgroundColor={solidBackgroundColor} photos={day?.photos ?? {}} samples={day?.samples ?? {}} caption={day?.caption ?? t.defaultCaption} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onCaptionChange={updateDraftCaption} onCaptionCommit={persistDraftCaption} onSelectFilm={selectFilm} onCapture={handleBackground} onSelectSolidBackground={handleSolidBackground} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
+          ? <ComposeScreen background={background} solidBackgroundColor={solidBackgroundColor} photos={day?.photos ?? {}} samples={day?.samples ?? {}} caption={day?.caption ?? t.defaultCaption} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onCaptionChange={updateDraftCaption} onCaptionCommit={persistDraftCaption} onSelectFilm={selectFilm} onCapture={handleBackground} onSelectSolidBackground={handleSolidBackground} onPickPolaroidColor={handlePickPolaroidColor} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
 
   const immersiveEditor = activeTab === 'today' && composing && !staged

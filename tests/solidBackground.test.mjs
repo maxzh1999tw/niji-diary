@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, SOLID_BACKGROUND_PRESETS } from '../src/solidBackground.js'
+import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from '../src/solidBackground.js'
 
 assert.equal(SOLID_BACKGROUND_PRESETS.length, 8)
 for (const preset of SOLID_BACKGROUND_PRESETS) {
@@ -18,8 +18,13 @@ assert.match(whiteSource, /fill="#FFFFFF"/)
 assert.equal(hslToHex(0, 100, 50), '#FF0000')
 assert.equal(hslToHex(120, 100, 50), '#00FF00')
 assert.equal(hslToHex(240, 100, 50), '#0000FF')
+assert.equal(rgbToHex(191, 230, 255), '#BFE6FF')
+assert.equal(rgbToHex(-5, 127.6, 999), '#0080FF')
 
-const appSource = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8')
+const [appSource, appStyles] = await Promise.all([
+  readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+  readFile(new URL('../src/styles.css', import.meta.url), 'utf8'),
+])
 const composeStart = appSource.indexOf('function ComposeScreen')
 const composeEnd = appSource.indexOf('function ArchivePolaroid', composeStart)
 const composeSource = appSource.slice(composeStart, composeEnd)
@@ -30,6 +35,14 @@ assert.doesNotMatch(appSource, /type="color"/)
 assert.match(appSource, /className="hue-range"/)
 assert.match(appSource, /className="saturation-range"/)
 assert.match(appSource, /className="lightness-range"/)
+assert.match(appSource, /const rangeHueColor = `hsl\(\$\{hue\} 100% 50%\)`/)
+assert.equal((appSource.match(/'--range-color': rangeHueColor/g) ?? []).length, 2)
+assert.match(composeSource, /interactionOverlay=\{eyedropperActive/)
+assert.match(composeSource, /onPickPolaroidColor\(point\)/)
+assert.match(appSource, /sampleImageSourceColor\(polaroidImage, point\)/)
+assert.match(appStyles, /\.solid-picker-mode-actions \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+assert.match(appStyles, /\.polaroid-eyedropper-target \{[\s\S]*?cursor: crosshair;/)
+assert.match(appStyles, /\.background-source:has\(input:focus-visible\),[\s\S]*?\.canvas-source-action:has\(input:focus-visible\) \{[\s\S]*?var\(--cyan\)/)
 
 const confirmStart = appSource.indexOf('async function confirmColor')
 const confirmEnd = appSource.indexOf('function resamplePhoto', confirmStart)

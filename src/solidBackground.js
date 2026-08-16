@@ -37,3 +37,8 @@ export function hslToHex(hue, saturation, lightness) {
   const match = l - chroma / 2
   return `#${[red, green, blue].map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`
 }
+
+export function rgbToHex(red, green, blue) {
+  const channelToHex = (channel) => Math.max(0, Math.min(255, Math.round(Number(channel) || 0))).toString(16).padStart(2, '0')
+  return `#${channelToHex(red)}${channelToHex(green)}${channelToHex(blue)}`.toUpperCase()
+}

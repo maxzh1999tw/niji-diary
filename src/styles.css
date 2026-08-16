@@ -425,3 +425,124 @@ img { max-width: 100%; }
 .custom-color-controls input[type="range"] {
   min-height: 44px;
 }
+
+/* Keep the film rail quiet until the user is actively scrolling it. */
+.film-picker-options {
+  scrollbar-color: transparent transparent;
+}
+
+.film-picker-options::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.film-picker-options.is-scrolling {
+  scrollbar-color: var(--purple) transparent;
+}
+
+.film-picker-options.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--purple);
+}
+
+/* Pointer focus should not leave a yellow ring; keyboard focus stays visible. */
+.background-source:focus-visible,
+.background-source:focus-within,
+.canvas-source-action:focus-visible,
+.canvas-source-action:focus-within {
+  outline: none;
+}
+
+.background-source:focus-visible,
+.background-source:has(input:focus-visible),
+.canvas-source-action:focus-visible,
+.canvas-source-action:has(input:focus-visible) {
+  outline: 3px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.canvas-source-action:focus-visible,
+.canvas-source-action:has(input:focus-visible) {
+  outline-offset: 2px;
+}
+
+.solid-picker-mode-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.solid-picker-mode-actions .custom-color-toggle {
+  margin-top: 0;
+}
+
+.eyedropper-toggle {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--cyan);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.eyedropper-toggle:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.eyedropper-toggle:focus-visible {
+  outline: 3px solid var(--purple);
+  outline-offset: 3px;
+}
+
+.eyedropper-toggle:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.solid-picker-dialog > .eyedropper-unavailable {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.polaroid-eyedropper-target {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: rgba(0, 219, 234, .04);
+  box-shadow: inset 0 0 0 4px var(--cyan), inset 0 0 0 7px rgba(255, 255, 255, .82);
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.polaroid-eyedropper-target:focus-visible {
+  outline: 4px solid var(--cyan);
+  outline-offset: -7px;
+}
+
+.polaroid-eyedropper-target.is-busy {
+  background: rgba(0, 219, 234, .12);
+  cursor: progress;
+}
+
+@media (max-width: 390px) {
+  .solid-picker-mode-actions {
+    grid-template-columns: 1fr;
+  }
+}
