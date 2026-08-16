@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from '../src/solidBackground.js'
+import { translations } from '../src/i18n.js'
 
 assert.equal(SOLID_BACKGROUND_PRESETS.length, 8)
 for (const preset of SOLID_BACKGROUND_PRESETS) {
@@ -20,6 +21,9 @@ assert.equal(hslToHex(120, 100, 50), '#00FF00')
 assert.equal(hslToHex(240, 100, 50), '#0000FF')
 assert.equal(rgbToHex(191, 230, 255), '#BFE6FF')
 assert.equal(rgbToHex(-5, 127.6, 999), '#0080FF')
+assert.equal(translations['zh-Hant'].composeTitle, '製作彩虹拍立得')
+assert.equal(translations['zh-Hant'].takeBackground, '選擇彩虹的背景')
+assert.equal(translations['zh-Hant'].takeBackgroundHint, '您可以選擇拍一張照片或上傳既有圖片作為拍立得的主要相片，在照片中加上今日的彩虹。也可以用純色作為背景。')
 
 const [appSource, appStyles] = await Promise.all([
   readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
