@@ -40,9 +40,11 @@
 
 ### GitHub Actions 部署流程
 
+- Niji 正式站一律透過 GitHub Actions 發佈，不要從本機直接執行 Wrangler Pages 部署指令。
 - `.github/workflows/deploy-release.yml`
   - 觸發條件：推送符合 `v*` 的 release tag。
   - 流程：`npm ci` → `npm test` → `npm run build`，接著部署正式站與 `test` 測試站。
+- 正式發布步驟：先確認變更已推送到 `main`，再建立並推送新的 `v*` tag；由 `deploy-release.yml` 執行驗證、建置與正式／測試站部署。
 - `.github/workflows/deploy-test.yml`
   - 觸發條件：手動 `workflow_dispatch`。
   - 輸入欄位：`ref`，可指定 branch、tag 或 commit，預設為 `main`。
@@ -58,6 +60,6 @@
 ### 部署維護注意事項
 
 - 根網域正式部署指令為 `pages deploy root-site --project-name=mia-and-max-root --branch=main`。
-- Wrangler 正式部署指令為 `pages deploy docs --project-name=niji-diary --branch=main`；測試站額外加上 `--branch=test`。release tag checkout 可能是 detached HEAD，因此正式部署必須明確指定 production branch。
+- Niji 的 Wrangler 指令僅由 GitHub Actions 內部執行；本機不得以 `pages deploy docs --project-name=niji-diary` 取代正式發布流程。
 - 修改部署流程後，至少確認 `npm test`、`npm run build`，並手動執行測試站 workflow。
 - 部署完成後確認正式站與測試站皆可正常回應，且不可清除或覆寫使用者既有資料。
