@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, FILMS } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayoutStyle, POLAROID_LAYOUT } from '../src/filmRendering.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayoutStyle, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -53,6 +53,12 @@ for (const film of FILMS) {
 }
 
 const classicSurface = getFilmRenderModel(DEFAULT_FILM_ID).svg
+const scopedSurface = scopeFilmRenderSvg(getFilmRenderModel('sky-blue').svg, 'preview:one')
+const scopedOverlay = scopeFilmRenderSvg(getFilmRenderModel('sky-blue').overlaySvg, 'preview:one')
+assert.match(scopedSurface, /id="paper-previewone"/)
+assert.match(scopedSurface, /url\(#paper-previewone\)/)
+assert.match(scopedOverlay, /id="frame-only-previewone"/)
+assert.match(scopedOverlay, /url\(#frame-only-previewone\)/)
 assert.equal(classicSurface.includes('<path'), false, 'classic white must remain undecorated')
 assert.equal(classicSurface.includes('<circle'), false, 'classic white must remain undecorated')
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).overlaySvg.includes('<path'), false, 'classic white overlay must remain empty')

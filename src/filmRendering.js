@@ -67,6 +67,15 @@ export function createFilmOverlaySvg(filmId) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet"><defs><mask id="frame-only" maskUnits="userSpaceOnUse" x="0" y="0" width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}"><rect width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}" fill="white"/><rect x="${x}" y="${y}" width="${width}" height="${height}" fill="black"/></mask></defs><g mask="url(#frame-only)">${artwork}</g></svg>`
 }
 
+export function scopeFilmRenderSvg(svg, scope) {
+  const suffix = String(scope).replace(/[^a-zA-Z0-9_-]/g, '') || 'film'
+  return svg
+    .replaceAll('id="paper"', `id="paper-${suffix}"`)
+    .replaceAll('#paper', `#paper-${suffix}`)
+    .replaceAll('id="frame-only"', `id="frame-only-${suffix}"`)
+    .replaceAll('#frame-only', `#frame-only-${suffix}`)
+}
+
 export function getFilmRenderModel(filmId) {
   const film = getFilm(filmId)
   const cached = renderModelCache.get(film.id)

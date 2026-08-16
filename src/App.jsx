@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { createFilmChallenges, DEFAULT_FILM_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmProgress, getFilmProgressChanges, normalizeFilmCollection } from './films.js'
-import { getFilmRenderModel, getPolaroidLayoutStyle } from './filmRendering.js'
+import { getFilmRenderModel, getPolaroidLayoutStyle, scopeFilmRenderSvg } from './filmRendering.js'
+import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
 import { formatText, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
 import { INFO_PAGE_META, infoContent } from './infoContent.js'
@@ -479,8 +480,9 @@ function FilmPhotoPlaceholder() {
 }
 
 function FilmSurface({ filmId }) {
-  const { surfaceUrl, overlayUrl } = getFilmRenderModel(filmId)
-  return <><img className="film-surface-artwork" src={surfaceUrl} alt="" aria-hidden="true" draggable="false" /><img className="film-surface-overlay" src={overlayUrl} alt="" aria-hidden="true" draggable="false" /></>
+  const scope = useId()
+  const { svg, overlaySvg } = getFilmRenderModel(filmId)
+  return <><div className="film-surface-artwork" aria-hidden="true" dangerouslySetInnerHTML={{ __html: scopeFilmRenderSvg(svg, scope) }} /><div className="film-surface-overlay" aria-hidden="true" dangerouslySetInnerHTML={{ __html: scopeFilmRenderSvg(overlaySvg, scope) }} /></>
 }
 
 function FilmPreviewCard({ filmId, lang, t, className = '' }) {
@@ -605,15 +607,7 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
   </div>, document.body)
 }
 
-function FilmChallengeStatus({ film, met, t }) {
-  return <div className={`film-challenge-status ${met ? 'is-met' : 'is-pending'}`} role="status" aria-live="polite">
-    <span className="film-challenge-status-icon"><Icon name={met ? 'check' : 'film'} size={18} /></span>
-    <span className="film-challenge-status-copy"><strong>{t[film.nameKey]}</strong><small>{t[film.conditionKey]}</small></span>
-    <b>{met ? t.filmChallengeMet : t.filmChallengePending}</b>
-  </div>
-}
-
-function FilmPicker({ selectedFilmId, unlockedFilmIds, challengeFilms, challengeResults, lang, t, onSelect }) {
+function FilmPicker({ selectedFilmId, unlockedFilmIds, lang, t, onSelect }) {
   const selectedFilm = getFilm(selectedFilmId)
   const availableFilms = FILMS.filter((film) => unlockedFilmIds.includes(film.id))
   return <section className="film-picker" aria-labelledby="film-picker-title">
@@ -622,13 +616,6 @@ function FilmPicker({ selectedFilmId, unlockedFilmIds, challengeFilms, challenge
       <div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></div>
       <span className="film-picker-current">{t[selectedFilm.nameKey]}</span>
     </div>
-    {challengeFilms.length > 0 ? <div className="film-challenge-summary" aria-label={t.filmChallengeGuideTitle}>
-      <div className="film-challenge-summary-heading"><strong>{t.filmChallengeGuideTitle}</strong><small>{t.filmChallengeGuideHint}</small></div>
-      <div className="film-challenge-summary-grid">{challengeFilms.map((film) => {
-        const met = challengeResults[film.unlock.achievement] === true
-        return <div className={`film-challenge-summary-item ${met ? 'is-met' : 'is-pending'}`} key={film.id}><Icon name={met ? 'check' : 'film'} size={15} /><span><b>{t[film.nameKey]}</b><small>{met ? t.filmChallengeMet : t.filmChallengePending}</small></span></div>
-      })}</div>
-    </div> : null}
     <div className="film-picker-options" id="film-picker-options" role="group" aria-label={t.filmPickerLabel} aria-describedby="film-picker-hint">
       {availableFilms.map((film) => {
         const selected = selectedFilm.id === film.id
@@ -979,6 +966,11 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
     queueTransform({ ...liveTransform.current, scale: liveTransform.current.scale * factor })
   }
 
+  function updateEditorValue(key, value) {
+    const current = liveTransform.current
+    queueTransform(key === 'radius' ? preserveRainbowTopAnchor(current, value) : { ...current, [key]: value })
+  }
+
   function resetRainbow() {
     const next = { x: 50, y: 58, scale: 1, rotation: 0, transparency: 0, radius: 1, colorWidth: 1, angle: 180 }
     if (renderFrame.current !== null) cancelAnimationFrame(renderFrame.current)
@@ -994,10 +986,6 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
     { key: 'colorWidth', icon: 'width', label: t.toolColorWidth, title: t.colorWidth, min: 0.5, max: 2, step: 0.05, value: transform.colorWidth ?? 1, output: `${Math.round((transform.colorWidth ?? 1) * 100)}%` },
     { key: 'film', icon: 'film', label: t.filmPickerLabel },
   ]
-  const challengeResults = createFilmChallenges({ caption, composition: transform }, t.defaultCaption)
-  const challengeFilms = FILMS.filter((film) => film.challengeTool && !unlockedFilmIds.includes(film.id))
-  const captionChallengeFilm = challengeFilms.find((film) => film.challengeTool === 'caption')
-  const activeChallengeFilm = challengeFilms.find((film) => film.challengeTool === activeTool)
   const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
   function handleCaptionChange(nextCaption) {
     latestCaption.current = nextCaption
@@ -1013,14 +1001,11 @@ function ComposeScreen({ background, photos, samples, caption, date, transform, 
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={onBack} aria-label={t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title">{background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="camera" size={46} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onFocus={captionChallengeFilm ? () => setActiveTool('caption') : undefined} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label></div></>} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId}><EditablePolaroidCaption value={caption} t={t} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
-        {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} challengeFilms={challengeFilms} challengeResults={challengeResults} lang={lang} t={t} onSelect={onSelectFilm} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => queueTransform({ ...liveTransform.current, [activeControl.key]: Number(event.target.value) })} /></label>}
-        {activeChallengeFilm ? <FilmChallengeStatus film={activeChallengeFilm} met={challengeResults[activeChallengeFilm.unlock.achievement] === true} t={t} /> : null}
+        {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => updateEditorValue(activeControl.key, Number(event.target.value))} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => {
-          const challengeFilm = challengeFilms.find((film) => film.challengeTool === tool.key)
-          const challengeMet = challengeFilm && challengeResults[challengeFilm.unlock.achievement] === true
-          return <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${challengeMet ? 'challenge-met' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span>{challengeMet ? <span className="toolbar-challenge-check" aria-hidden="true"><Icon name="check" size={11} /></span> : null}</button>
+          return <button type="button" key={tool.key} className={`${activeTool === tool.key ? 'active' : ''} ${tool.key === 'film' ? 'toolbar-film' : ''}`} aria-pressed={activeTool === tool.key} onClick={() => setActiveTool(tool.key)}><Icon name={tool.icon} size={21} /><span>{tool.label}</span></button>
         })}</div>
       </div>
     </div>}

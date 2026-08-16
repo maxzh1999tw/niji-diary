@@ -343,6 +343,26 @@ img { max-width: 100%; }
   text-wrap: balance;
 }
 
+/* Keep the studio dock shrinkable so the film row can own its horizontal scroll. */
+.studio-workspace,
+.editor-dock,
+.film-picker,
+.film-picker-options { min-width: 0; }
+.film-picker { width: 100%; }
+.film-picker-options { width: 100%; max-width: 100%; }
+.film-picker-heading strong,
+.film-picker-current,
+.film-option-name {
+  max-width: none;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+.film-picker-current { flex: 0 1 auto; }
+.film-surface-artwork > svg,
+.film-surface-overlay > svg { width: 100%; height: 100%; display: block; }
+
 .film-bookmark-condition {
   display: block;
   overflow: visible;

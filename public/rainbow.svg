@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Rainbow test background">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc7e9" />
+      <stop offset="0.52" stop-color="#d5d2ff" />
+      <stop offset="1" stop-color="#9ee8ed" />
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8bd9a7" />
+      <stop offset="1" stop-color="#3f9d85" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#sky)" />
+  <circle cx="650" cy="180" r="72" fill="#fff2a6" opacity="0.9" />
+  <path d="M-30 700 C155 515 286 535 410 690 C536 848 680 802 830 650 L830 1030 L-30 1030 Z" fill="url(#hill)" />
+  <path d="M-80 740 C120 480 310 490 438 684 C526 818 642 804 880 572" fill="none" stroke="#fff" stroke-width="34" opacity="0.86" />
+  <path d="M-80 700 C120 440 310 450 438 644 C526 778 642 764 880 532" fill="none" stroke="#ff6b9f" stroke-width="22" opacity="0.9" />
+  <path d="M-80 660 C120 400 310 410 438 604 C526 738 642 724 880 492" fill="none" stroke="#ffd45c" stroke-width="22" opacity="0.9" />
+  <path d="M-80 620 C120 360 310 370 438 564 C526 698 642 684 880 452" fill="none" stroke="#63d7cf" stroke-width="22" opacity="0.9" />
+</svg>
