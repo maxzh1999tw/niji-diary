@@ -43,12 +43,12 @@
 - Niji 正式站一律透過 GitHub Actions 發佈，不要從本機直接執行 Wrangler Pages 部署指令。
 - `.github/workflows/deploy-release.yml`
   - 觸發條件：推送符合 `v*` 的 release tag。
-  - 流程：`npm ci` → `npm test` → `npm run build`，接著部署正式站與 `test` 測試站。
+  - 流程：以 Node.js 24 執行 `npm ci` → `npm test` → `npm run build`，再使用 `cloudflare/wrangler-action@v4` 部署正式站與 `test` 測試站。
 - 正式發布步驟：先確認變更已推送到 `main`，再建立並推送新的 `v*` tag；由 `deploy-release.yml` 執行驗證、建置與正式／測試站部署。
 - `.github/workflows/deploy-test.yml`
   - 觸發條件：手動 `workflow_dispatch`。
   - 輸入欄位：`ref`，可指定 branch、tag 或 commit，預設為 `main`。
-  - 流程：以指定 ref 建置，部署至 `test` 測試站。
+  - 流程：以 Node.js 24 建置，使用 `cloudflare/wrangler-action@v4` 部署至 `test` 測試站。
 
 ### GitHub Actions Secrets
 
