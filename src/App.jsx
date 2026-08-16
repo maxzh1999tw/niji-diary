@@ -1488,7 +1488,7 @@ function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, on
           </button>)}
         </div>
       </section>
-      <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v2.0 · Y2K EDITION</small></div>
+      <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v1.0.5 · Max Edition</small></div>
     </section>
   )
 }
