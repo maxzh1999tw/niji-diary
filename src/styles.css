@@ -188,7 +188,7 @@ img { max-width: 100%; }
 .film-layout-choices button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .film-layout-choices button.selected { border-color: var(--ink); background: #fff4fb; box-shadow: 3px 3px 0 var(--ink); }
 .layout-thumbnail { position: relative; width: 28px; aspect-ratio: 2/3; display: block; overflow: hidden; border: 0; border-radius: 1px; background: transparent; color: inherit; box-shadow: none; container-type: inline-size; }
-.layout-thumbnail > .layout-thumbnail-preview { position: absolute; top: 50%; left: 50%; width: 82px; aspect-ratio: 2/3; display: block; overflow: hidden; flex: none; transform: translate(-50%, -50%) scale(calc((100cqw - 6px) / 82px)); transform-origin: center; box-shadow: none; pointer-events: none; }
+.layout-thumbnail > .layout-thumbnail-preview { position: absolute; top: 50%; left: 50%; width: 82px; aspect-ratio: 2/3; display: block; overflow: hidden; flex: none; transform: translate(-50%, -50%) rotate(-2deg) scale(calc((100cqw - 6px) / 82px)); transform-origin: center; box-shadow: 3px 3px 0 var(--ink); pointer-events: none; }
 .layout-thumbnail > .layout-thumbnail-preview .polaroid-caption-placeholder { width: 16cqw; height: clamp(1.5px, 3.4cqw, 2.5px); }
 .film-layout-support { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; color: var(--ink-soft); }
 .film-layout-support > span { margin: 0; font-size: 12px; font-weight: 800; }
