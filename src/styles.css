@@ -190,7 +190,7 @@ img { max-width: 100%; }
 .layout-thumbnail { position: relative; width: 28px; aspect-ratio: 2/3; display: block; overflow: hidden; border: 0; border-radius: 1px; background: transparent; color: inherit; box-shadow: none; container-type: inline-size; }
 .layout-thumbnail > .layout-thumbnail-preview { position: absolute; top: 50%; left: 50%; width: 82px; aspect-ratio: 2/3; display: block; overflow: hidden; flex: none; transform: translate(-50%, -50%) rotate(-2deg) scale(calc((100cqw - 6px) / 82px)); transform-origin: center; box-shadow: 3px 3px 0 var(--ink); pointer-events: none; }
 .layout-thumbnail > .layout-thumbnail-preview .polaroid-caption-placeholder { width: 16cqw; height: clamp(1.5px, 3.4cqw, 2.5px); }
-.film-layout-support { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; margin: 0; padding-left: 8px; border-left: 2px solid #c9bdd6; color: var(--ink-soft); }
+.film-layout-support { align-self: stretch; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; margin: 0; padding-left: 4px; border-left: 1px solid #68636d; color: var(--ink-soft); }
 .film-layout-support > div { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .film-layout-support-item { width: 36px; min-height: 54px; display: grid; place-items: center; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .film-layout-support-item .layout-thumbnail { width: 36px; color: var(--ink-soft); }
