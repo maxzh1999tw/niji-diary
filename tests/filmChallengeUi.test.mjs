@@ -75,6 +75,7 @@ assert.doesNotMatch(appStyles, /\.studio-layout-choices button(?:\.selected|:hov
 assert.doesNotMatch(appSource, /layout-thumbnail-(?:main|sources|caption)/, 'layout thumbnails must not duplicate the full preview with schematic blocks')
 assert.match(appStyles, /\.polaroid-caption-placeholder \{[^}]*width: 23\.4cqw;[^}]*height: clamp\(1px, 4\.878cqw, 4px\);/, 'preview caption placeholders must scale in both dimensions with the shared card container')
 assert.match(appStyles, /\.layout-thumbnail > \.layout-thumbnail-preview \.polaroid-caption-placeholder \{[^}]*width: 16cqw;[^}]*height: clamp\(1\.5px, 3\.4cqw, 2\.5px\);/, 'layout thumbnail caption placeholders must stay finer than the full preview after the card is scaled')
+assert.match(appStyles, /\.composition-canvas \.polaroid-caption-input \{[^}]*font-size: max\(12px, var\(--polaroid-caption-size, 4\.5cqw\)\)/, 'studio caption text must inherit the shared card-relative size instead of a fixed minimum')
 assert.doesNotMatch(appStyles, /\.layout-mosaic-seven \.polaroid-source-image img/, 'all layouts must share the same centered cover crop for source photos')
 assert.match(appSource, /canvas-stage"><div className="canvas-source-actions">[\s\S]*?<PolaroidCard className="composition-canvas"/, 'background actions must live on the studio stage rather than inside the main photo')
 assert.match(appStyles, /\.canvas-source-actions \{[^}]*top: 16px;[^}]*right: 18px;[^}]*flex-direction: column;/, 'background actions must stay vertically stacked in the upper-right corner of the studio stage')

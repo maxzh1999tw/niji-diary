@@ -13,6 +13,12 @@ function contrastRatio(left, right) {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+function artworkAnchor(shape) {
+  if (Number.isFinite(shape.cx) && Number.isFinite(shape.cy)) return { x: shape.cx, y: shape.cy }
+  const match = shape.d?.match(/M\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/)
+  return match ? { x: Number(match[1]), y: Number(match[2]) } : null
+}
+
 assert.equal(POLAROID_LAYOUT.width / POLAROID_LAYOUT.height, 2 / 3)
 assert.equal(POLAROID_LAYOUT.photo.width / POLAROID_LAYOUT.photo.height, 4 / 5)
 assert.equal(POLAROID_LAYOUT.sources.y, POLAROID_LAYOUT.photo.y + POLAROID_LAYOUT.photo.height + 24)
@@ -132,6 +138,12 @@ for (const film of FILMS) {
   assert.equal(mosaicModel.overlaySvg, createFilmOverlaySvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic overlay must use its layout artwork`)
   assert.equal(classicArtwork, film.artwork, `${film.id} classic artwork must keep the original artwork array`)
   assert.ok(Array.isArray(mosaicArtwork), `${film.id} mosaic artwork must be declared as an array`)
+  assert.ok(mosaicArtwork.length >= 7, `${film.id} mosaic artwork must distribute several decorative details across the card`)
+  const anchors = mosaicArtwork.map(artworkAnchor).filter(Boolean)
+  assert.ok(anchors.some(({ x }) => x <= 80), `${film.id} mosaic artwork must use the left-side whitespace`)
+  assert.ok(anchors.some(({ x, y }) => x >= 318 && y >= 1137), `${film.id} mosaic artwork must use the caption area`)
+  assert.ok(anchors.some(({ x, y }) => x >= 293 && x <= 317 && y >= 35 && y <= 1111), `${film.id} mosaic artwork must use the narrow layout gap`)
+  assert.ok(anchors.some(({ x, y }) => x >= 840 && y <= 310), `${film.id} mosaic artwork must retain a top-right asymmetric motif`)
   assert.notEqual(mosaicArtwork, classicArtwork, `${film.id} must provide a distinct mosaic artwork array`)
 }
 
