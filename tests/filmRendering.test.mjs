@@ -77,6 +77,9 @@ for (const film of FILMS) {
   assert.equal(decodeURIComponent(model.overlayUrl.split(',')[1]), model.overlaySvg)
   assert.equal(model.svg, createFilmSurfaceSvg(film.id))
   assert.equal(model.overlaySvg, createFilmOverlaySvg(film.id))
+  if (film.artwork.length) {
+    assert.match(`${model.svg}${model.overlaySvg}`, /vector-effect="none"/, `${film.id} artwork strokes must remain viewport-scaled`)
+  }
   assert.equal(surfaceShapeCount, backgroundArtworkCount, `${film.id} background artwork must render exactly once`)
   assert.equal(overlayShapeCount, foregroundArtworkCount, `${film.id} foreground artwork must render exactly once`)
   if (foregroundArtworkCount) {

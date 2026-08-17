@@ -172,6 +172,7 @@ function renderArtworkShape(shape, accent) {
     `fill="${escapeAttribute(fill)}"`,
     stroke ? `stroke="${escapeAttribute(stroke)}"` : '',
     stroke && shape.strokeWidth ? `stroke-width="${shape.strokeWidth}"` : '',
+    'vector-effect="none"',
     stroke && shape.strokeLinecap ? `stroke-linecap="${escapeAttribute(shape.strokeLinecap)}"` : '',
     stroke && shape.strokeLinejoin ? `stroke-linejoin="${escapeAttribute(shape.strokeLinejoin)}"` : '',
     `opacity="${shape.opacity ?? 1}"`,
