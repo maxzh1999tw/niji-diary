@@ -784,8 +784,15 @@ function PolaroidCaption({ children, placeholder = false }) {
   return <span className={`polaroid-caption-text ${placeholder ? 'polaroid-caption-placeholder' : ''}`} aria-hidden={placeholder || undefined}>{children}</span>
 }
 
+const MAX_MULTILINE_CAPTION_LINES = 3
+
+function clampCaptionLines(value, maxLines = MAX_MULTILINE_CAPTION_LINES) {
+  const normalized = String(value).replaceAll('\r\n', '\n').replaceAll('\r', '\n')
+  return normalized.split('\n').slice(0, maxLines).join('\n')
+}
+
 function EditablePolaroidCaption({ value, t, multiline = false, onChange, onCommit, onFocus }) {
-  const commonProps = { className: 'polaroid-caption-input', 'aria-label': t.captionLabel, maxLength: 60, value, onFocus, onChange: (event) => onChange(event.target.value), onBlur: (event) => onCommit(event.target.value) }
+  const commonProps = { className: 'polaroid-caption-input', 'aria-label': t.captionLabel, maxLength: 60, value, onFocus, onChange: (event) => onChange(multiline ? clampCaptionLines(event.target.value) : event.target.value), onBlur: (event) => onCommit(multiline ? clampCaptionLines(event.target.value) : event.target.value) }
   return multiline
     ? <textarea {...commonProps} rows="3" />
     : <input {...commonProps} type="text" onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />

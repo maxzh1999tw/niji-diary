@@ -29,6 +29,13 @@ const MOSAIC_TOP_THIRD_X = MOSAIC_TOP_SECOND_X + MOSAIC_COLOR_SIZE + MOSAIC_HORI
 const MOSAIC_MAIN_X = MOSAIC_SIDE_MARGIN + MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP
 const MOSAIC_MAIN_WIDTH = MOSAIC_CARD_WIDTH - MOSAIC_SIDE_MARGIN - MOSAIC_MAIN_X
 const MOSAIC_MAIN_HEIGHT = MOSAIC_MAIN_WIDTH * 5 / 4
+const MOSAIC_VERTICAL_COLUMN_BOTTOM = MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3 + MOSAIC_COLOR_SIZE
+const MOSAIC_CAPTION_TOP = 1175
+const MOSAIC_CAPTION_HEIGHT = MOSAIC_VERTICAL_COLUMN_BOTTOM - MOSAIC_CAPTION_TOP
+const MOSAIC_CAPTION_DATE_GAP = 12
+const MOSAIC_DATE_Y = MOSAIC_VERTICAL_COLUMN_BOTTOM + MOSAIC_CAPTION_DATE_GAP
+const MOSAIC_DATE_HEIGHT = 86
+const MOSAIC_DATE_BASELINE = MOSAIC_DATE_Y + MOSAIC_DATE_HEIGHT / 2
 
 export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
   id: MOSAIC_LAYOUT_ID,
@@ -46,9 +53,9 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
   ]),
   sourceFrame: POLAROID_SOURCE_FRAME,
-  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: 1175, width: MOSAIC_MAIN_WIDTH, height: 188, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
-  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
-  footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
+  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
+  date: Object.freeze({ x: 730, y: MOSAIC_DATE_Y, width: 220, height: MOSAIC_DATE_HEIGHT, fontSize: 34, baselineY: MOSAIC_DATE_BASELINE }),
+  footer: Object.freeze({ x: 50, textY: MOSAIC_DATE_BASELINE, dateWidth: 220 }),
 })
 
 export const POLAROID_LAYOUTS = Object.freeze({

@@ -33,6 +33,9 @@ assert.doesNotMatch(appSource, /drawContainAt|const drawSource =/, 'the mosaic l
 assert.match(appSource, /wrapCanvasText\(context, caption, captionLayout\.width, captionLayout\.maxLines\)/, 'canvas captions must wrap within the shared caption geometry')
 assert.match(appSource, /multiline=\{selectedLayoutId === MOSAIC_LAYOUT_ID\}/, 'the corner layout editor must enable multiline input')
 assert.match(appSource, /\? <textarea \{\.\.\.commonProps\} rows="3" \/>/, 'multiline captions must use a real textarea')
+assert.match(appSource, /const MAX_MULTILINE_CAPTION_LINES = 3/, 'multiline captions must expose a three-line input limit')
+assert.match(appSource, /function clampCaptionLines\(value, maxLines = MAX_MULTILINE_CAPTION_LINES\)/, 'multiline captions must clamp pasted line breaks')
+assert.match(appSource, /onChange: \(event\) => onChange\(multiline \? clampCaptionLines\(event\.target\.value\) : event\.target\.value\)/, 'multiline caption changes must keep the three-line limit')
 assert.match(appSource, /stored-polaroid-caption-slot" style=\{geometry\.captionCardStyle\}/, 'completed Polaroids must restore captions using their saved layout geometry')
 assert.doesNotMatch(appSource, /mosaic-source-row|mosaic-source-column|mosaic-body/, 'layout geometry must not be duplicated as special-case JSX')
 assert.doesNotMatch(appSource.slice(appSource.indexOf('function FilmPicker('), appSource.indexOf('function PolaroidCard')), /film-picker-current/, 'Rainbow Studio must use layout thumbnails instead of repeating the selected film name')
@@ -87,7 +90,7 @@ assert.match(appStyles, /\.film-layout-support > div \{[^}]*flex-direction: colu
 assert.match(appStyles, /\.film-layout-support-item \{[^}]*width: 36px;[^}]*min-height: 54px;[^}]*padding: 0;[^}]*border: 0;[^}]*background: transparent;[^}]*box-shadow: none;/, 'additional layout thumbnails must render without an inner frame or background')
 assert.match(appStyles, /\.film-layout-support-item \.layout-thumbnail \{[^}]*width: 36px;/, 'additional layout thumbnails must be enlarged and shifted toward the divider')
 assert.doesNotMatch(appStyles, /\.editor-dock \{[^}]*box-shadow: [^;}]*rgba\(255,79,186/, 'the editor dock must not add a purple separator below the studio background')
-assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally')
+assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally within the shared slot')
 assert.match(appStyles, /\.film-picker-heading strong,\s*\.film-picker-current,\s*\.film-option-name \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/)
 
 console.log('Film challenge UI: Rainbow Studio only lists unlocked films, keeps challenge notices in the bookmark, and supports anchored radius controls.')
