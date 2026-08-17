@@ -690,9 +690,10 @@ function FilmLayoutChoices({ filmId, selectedLayoutId, lang, t, onSelect, classN
   </div>
 }
 
-function FilmLayoutSupport({ filmId, lang, t }) {
+function FilmLayoutSupport({ filmId, layoutIds = [], lang, t }) {
+  if (!layoutIds.length) return null
   return <div className="film-layout-support" role="group" aria-label={t.layoutSupportedLabel}>
-    <div>{getSupportedFilmLayoutIds(filmId).map((layoutId) => {
+    <div>{layoutIds.map((layoutId) => {
       const name = t[LAYOUT_NAME_KEYS[layoutId]] ?? layoutId
       return <div className="film-layout-support-item" key={layoutId} title={name}><LayoutThumbnail filmId={filmId} layoutId={layoutId} lang={lang} t={t} /><span className="visually-hidden">{name}</span></div>
     })}</div>
@@ -1640,8 +1641,9 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onS
         const isSelected = filmCollection.selectedFilmId === film.id
         const progress = getFilmProgress(film, completedDays)
         const collectedDayparts = film.unlock.type === 'distinct-dayparts' ? new Set(getCollectedFilmDayparts(completedDays)) : null
+        const additionalLayoutIds = getSupportedFilmLayoutIds(film.id).filter((layoutId) => layoutId !== DEFAULT_LAYOUT_ID)
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
-          <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><FilmLayoutSupport filmId={film.id} lang={lang} t={t} /></div>
+          <div className={`film-card-top ${additionalLayoutIds.length ? 'has-layout-support' : ''}`}><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><FilmLayoutSupport filmId={film.id} layoutIds={additionalLayoutIds} lang={lang} t={t} /></div>
           <h2>{t[film.nameKey]}</h2>
           {isUnlocked ? <button className={`film-use-button ${isSelected ? 'is-active' : ''}`} type="button" disabled={isSelected} aria-pressed={isSelected} onClick={() => onSelectFilm(film.id)}>{isSelected ? t.filmSelected : t.useFilm}</button> : <>
             <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
