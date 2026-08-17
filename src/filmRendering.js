@@ -28,7 +28,7 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: 42, y: 740, width: 211, height: 211 }),
   ]),
   sourceFrame: Object.freeze({ innerX: 7, innerY: 7, innerBottom: 7, accentHeight: 8 }),
-  caption: Object.freeze({ x: 42, y: 1138, width: 916, height: 225, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
+  caption: Object.freeze({ x: 42, y: 1160, width: 916, height: 203, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
   date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })

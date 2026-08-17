@@ -681,32 +681,29 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
   </div>, document.body)
 }
 
-function LayoutThumbnail({ layoutId }) {
-  const geometry = getPolaroidLayoutGeometry(layoutId)
-  return <span className="layout-thumbnail" aria-hidden="true">
-    <i className="layout-thumbnail-main" style={geometry.photoThumbnailStyle} />
-    <span className="layout-thumbnail-sources">{geometry.sources.map((source, index) => <i key={COLOR_KEYS[index]} style={source.thumbnailStyle} />)}</span>
-    <i className="layout-thumbnail-caption" style={geometry.captionThumbnailStyle} />
-  </span>
+function LayoutThumbnail({ filmId, layoutId, lang, t }) {
+  return <div className="layout-thumbnail" aria-hidden="true">
+    <FilmPreviewCard className="layout-thumbnail-preview" filmId={filmId} layoutId={layoutId} lang={lang} t={t} />
+  </div>
 }
 
-function FilmLayoutChoices({ filmId, selectedLayoutId, t, onSelect, className = '' }) {
+function FilmLayoutChoices({ filmId, selectedLayoutId, lang, t, onSelect, className = '' }) {
   const supportedLayoutIds = getSupportedFilmLayoutIds(filmId)
   return <div className={`film-layout-choices ${className}`} role="group" aria-label={t.layoutPickerLabel}>
     {supportedLayoutIds.map((layoutId) => {
       const selected = layoutId === selectedLayoutId
       const name = t[LAYOUT_NAME_KEYS[layoutId]] ?? layoutId
-      return <button type="button" key={layoutId} className={selected ? 'selected' : ''} aria-label={formatText(t.useLayout, { name })} aria-pressed={selected} title={name} onClick={() => onSelect(layoutId)}><LayoutThumbnail layoutId={layoutId} /><span className="visually-hidden">{name}</span></button>
+      return <button type="button" key={layoutId} className={selected ? 'selected' : ''} aria-label={formatText(t.useLayout, { name })} aria-pressed={selected} title={name} onClick={() => onSelect(layoutId)}><LayoutThumbnail filmId={filmId} layoutId={layoutId} lang={lang} t={t} /><span className="visually-hidden">{name}</span></button>
     })}
   </div>
 }
 
-function FilmLayoutSupport({ filmId, t }) {
+function FilmLayoutSupport({ filmId, lang, t }) {
   return <div className="film-layout-support" aria-label={t.layoutSupportedLabel}>
     <span>{t.layoutSupportedLabel}</span>
     <div>{getSupportedFilmLayoutIds(filmId).map((layoutId) => {
       const name = t[LAYOUT_NAME_KEYS[layoutId]] ?? layoutId
-      return <span className="film-layout-support-item" key={layoutId} title={name}><LayoutThumbnail layoutId={layoutId} /><span className="visually-hidden">{name}</span></span>
+      return <div className="film-layout-support-item" key={layoutId} title={name}><LayoutThumbnail filmId={filmId} layoutId={layoutId} lang={lang} t={t} /><span className="visually-hidden">{name}</span></div>
     })}</div>
   </div>
 }
@@ -747,7 +744,7 @@ function FilmPicker({ selectedFilmId, selectedLayoutId, unlockedFilmIds, lang, t
     <span className="visually-hidden" id="film-picker-hint">{t.filmPickerHint}</span>
     <div className="film-picker-heading">
       <div><span className="micro-label">FILM SELECT</span><strong id="film-picker-title">{t.filmPickerLabel}</strong></div>
-      <FilmLayoutChoices filmId={selectedFilm.id} selectedLayoutId={selectedLayoutId} t={t} onSelect={onSelectLayout} className="studio-layout-choices" />
+      <FilmLayoutChoices filmId={selectedFilm.id} selectedLayoutId={selectedLayoutId} lang={lang} t={t} onSelect={onSelectLayout} className="studio-layout-choices" />
     </div>
     <div className={`film-picker-options ${scrolling ? 'is-scrolling' : ''}`} id="film-picker-options" role="group" aria-label={t.filmPickerLabel} aria-describedby="film-picker-hint" onPointerDown={prepareFilmScroll} onWheel={prepareFilmScroll} onKeyDown={prepareKeyboardScroll} onScroll={revealFilmScrollbar}>
       {availableFilms.map((film) => {
@@ -1642,7 +1639,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onS
 
   return <section className="films-screen screen-enter" aria-labelledby="films-title">
     <div className="screen-title"><span className="chrome-kicker">FILM COLLECTION</span><h1 id="films-title">{t.filmCollectionTitle}</h1><p>{t.filmCollectionHint}</p></div>
-    <div className="film-collection-summary"><FilmPreviewCard filmId={filmCollection.selectedFilmId} layoutId={filmCollection.selectedLayoutId} lang={lang} t={t} /><div className="film-collection-current"><strong>{formatText(t.filmCollectionProgress, { unlocked: unlockedCount, total: FILMS.length })}</strong><span>{t.filmCurrent}{t[selectedFilm.nameKey]}</span><FilmLayoutChoices filmId={selectedFilm.id} selectedLayoutId={filmCollection.selectedLayoutId} t={t} onSelect={onSelectLayout} /></div><div className="film-count-orb"><b>{unlockedCount}</b><span>/{FILMS.length}</span></div></div>
+    <div className="film-collection-summary"><FilmPreviewCard filmId={filmCollection.selectedFilmId} layoutId={filmCollection.selectedLayoutId} lang={lang} t={t} /><div className="film-collection-current"><strong>{formatText(t.filmCollectionProgress, { unlocked: unlockedCount, total: FILMS.length })}</strong><span>{t.filmCurrent}{t[selectedFilm.nameKey]}</span><FilmLayoutChoices filmId={selectedFilm.id} selectedLayoutId={filmCollection.selectedLayoutId} lang={lang} t={t} onSelect={onSelectLayout} /></div><div className="film-count-orb"><b>{unlockedCount}</b><span>/{FILMS.length}</span></div></div>
     <div className="film-filter-bar" role="tablist" aria-label={t.filmCollectionListLabel}>
       {[['all', t.filmFilterAll], ['unlocked', t.filmFilterUnlocked], ['locked', t.filmFilterLocked]].map(([key, label]) => <button type="button" key={key} role="tab" aria-selected={filter === key} className={filter === key ? 'active' : ''} onClick={() => setFilter(key)}>{label}</button>)}
     </div>
@@ -1655,7 +1652,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onS
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
           <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /></div>
           <h2>{t[film.nameKey]}</h2>
-          <FilmLayoutSupport filmId={film.id} t={t} />
+          <FilmLayoutSupport filmId={film.id} lang={lang} t={t} />
           {isUnlocked ? <button className={`film-use-button ${isSelected ? 'is-active' : ''}`} type="button" disabled={isSelected} aria-pressed={isSelected} onClick={() => onSelectFilm(film.id)}>{isSelected ? t.filmSelected : t.useFilm}</button> : <>
             <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
             {collectedDayparts ? <div className="film-daypart-list" role="list" aria-label={t.filmDaypartProgressLabel}>{FILM_DAYPART_KEYS.map((daypart) => {
