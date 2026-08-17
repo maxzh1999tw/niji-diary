@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, FILMS, MOSAIC_LAYOUT_ID } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -34,7 +34,7 @@ assert.equal(mosaicSources.length, 7)
 assert.deepEqual(mosaicSources.slice(0, 4).map(({ x, y }) => [x, y]), [[42, 35], [277, 35], [512, 35], [747, 35]], 'the first four color photos must form one horizontal row')
 assert.deepEqual(mosaicSources.slice(4).map(({ x, y }) => [x, y]), [[42, 270], [42, 505], [42, 740]], 'the final three color photos must stack on the left')
 assert.ok(mosaicSources.every(({ width, height }) => width === height), 'all seven color-photo frames must be square')
-assert.ok(mosaicGeometry.sources.every(({ imageRect }) => imageRect.width === imageRect.height), 'all seven visible color-photo areas must be square')
+assert.ok(mosaicSources.every((source) => Object.entries(POLAROID_SOURCE_FRAME).every(([key, value]) => source[key] === value)), 'new layout color frames must reuse the default frame design')
 assert.ok(mosaicSources.every((source, index) => source.width > classicSources[index].width), 'all color photos must be larger than in the classic layout')
 assert.equal(mosaicLayout.photo.x, mosaicSources[1].x, 'the main photo must align below the second tile to form the inner corner')
 assert.equal(mosaicLayout.photo.y, mosaicSources[4].y, 'the main photo and left column must start on the same row')

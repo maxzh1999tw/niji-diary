@@ -1,12 +1,14 @@
 import { DEFAULT_LAYOUT_ID, getFilm, getFilmLayoutId, MOSAIC_LAYOUT_ID } from './films.js'
 
+export const POLAROID_SOURCE_FRAME = Object.freeze({ innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 })
+
 export const POLAROID_LAYOUT = Object.freeze({
   id: DEFAULT_LAYOUT_ID,
   width: 1000,
   height: 1500,
   mediaHeight: 1336.5,
   photo: Object.freeze({ x: 35, y: 35, width: 930, height: 1162.5 }),
-  sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 }),
+  sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, ...POLAROID_SOURCE_FRAME }),
   caption: Object.freeze({ x: 50, y: 1366, width: 600, height: 104, fontSize: 45, lineHeight: 52, maxLines: 1, baselineY: 1418, verticalAlign: 'middle' }),
   date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
@@ -27,7 +29,7 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: 42, y: 505, width: 211, height: 211 }),
     Object.freeze({ x: 42, y: 740, width: 211, height: 211 }),
   ]),
-  sourceFrame: Object.freeze({ innerX: 7, innerY: 7, innerBottom: 7, accentHeight: 8 }),
+  sourceFrame: POLAROID_SOURCE_FRAME,
   caption: Object.freeze({ x: 42, y: 1160, width: 916, height: 203, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
   date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
