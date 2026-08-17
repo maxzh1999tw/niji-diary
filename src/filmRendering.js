@@ -22,7 +22,9 @@ const MOSAIC_SIDE_MARGIN = 42
 const MOSAIC_COLOR_SIZE = 250
 const MOSAIC_HORIZONTAL_GAP = (MOSAIC_CARD_WIDTH - MOSAIC_SIDE_MARGIN * 2 - MOSAIC_COLOR_SIZE * 3) / 2
 const MOSAIC_VERTICAL_GAP = 26
-const MOSAIC_MAIN_X = MOSAIC_SIDE_MARGIN + MOSAIC_COLOR_SIZE + MOSAIC_HORIZONTAL_GAP
+const MOSAIC_TOP_SECOND_X = MOSAIC_SIDE_MARGIN + MOSAIC_COLOR_SIZE + MOSAIC_HORIZONTAL_GAP
+const MOSAIC_TOP_THIRD_X = MOSAIC_TOP_SECOND_X + MOSAIC_COLOR_SIZE + MOSAIC_HORIZONTAL_GAP
+const MOSAIC_MAIN_X = MOSAIC_SIDE_MARGIN + MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP
 const MOSAIC_MAIN_WIDTH = MOSAIC_CARD_WIDTH - MOSAIC_SIDE_MARGIN - MOSAIC_MAIN_X
 const MOSAIC_MAIN_HEIGHT = MOSAIC_MAIN_WIDTH * 5 / 4
 
@@ -34,15 +36,15 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
   photo: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_MAIN_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_MAIN_HEIGHT }),
   sourceRects: Object.freeze([
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: 35, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
-    Object.freeze({ x: MOSAIC_MAIN_X, y: 35, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
-    Object.freeze({ x: MOSAIC_MAIN_X + MOSAIC_COLOR_SIZE + MOSAIC_HORIZONTAL_GAP, y: 35, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
+    Object.freeze({ x: MOSAIC_TOP_SECOND_X, y: 35, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
+    Object.freeze({ x: MOSAIC_TOP_THIRD_X, y: 35, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 2, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
   ]),
   sourceFrame: POLAROID_SOURCE_FRAME,
-  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: 1103, width: MOSAIC_MAIN_WIDTH, height: 263, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
+  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: 1175, width: MOSAIC_MAIN_WIDTH, height: 188, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
   date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })
