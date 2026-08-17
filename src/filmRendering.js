@@ -10,7 +10,7 @@ export const POLAROID_LAYOUT = Object.freeze({
   photo: Object.freeze({ x: 35, y: 35, width: 930, height: 1162.5 }),
   sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, ...POLAROID_SOURCE_FRAME }),
   caption: Object.freeze({ x: 50, y: 1366, width: 600, height: 104, fontSize: 45, lineHeight: 52, maxLines: 1, baselineY: 1418, verticalAlign: 'middle' }),
-  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
+  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 40, lineHeight: 40, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })
 
@@ -53,8 +53,8 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
   ]),
   sourceFrame: POLAROID_SOURCE_FRAME,
-  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 36, lineHeight: 44, maxLines: 4, verticalAlign: 'top' }),
-  date: Object.freeze({ x: 730, y: MOSAIC_DATE_Y, width: 220, height: MOSAIC_DATE_HEIGHT, fontSize: 34, baselineY: MOSAIC_DATE_BASELINE }),
+  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 42, lineHeight: 52, maxLines: 4, verticalAlign: 'top' }),
+  date: Object.freeze({ x: 730, y: MOSAIC_DATE_Y, width: 220, height: MOSAIC_DATE_HEIGHT, fontSize: 40, lineHeight: 40, baselineY: MOSAIC_DATE_BASELINE }),
   footer: Object.freeze({ x: 50, textY: MOSAIC_DATE_BASELINE, dateWidth: 220 }),
 })
 
@@ -171,7 +171,7 @@ export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
   const dateCardStyle = Object.freeze({
     ...cardRectStyle(layout.date, layout.width),
     '--polaroid-date-font-size': `${layout.date.fontSize}px`,
-    '--polaroid-date-line-height-px': `${layout.date.fontSize}px`,
+    '--polaroid-date-line-height-px': `${layout.date.lineHeight ?? layout.date.fontSize}px`,
     '--polaroid-date-css-scale': '1',
     '--polaroid-date-visual-scale': '1',
     '--polaroid-date-content-width': '100%',

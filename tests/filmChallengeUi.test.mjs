@@ -104,6 +104,8 @@ assert.match(appStyles, /--polaroid-caption-line-height-px/, 'caption typography
 assert.match(appStyles, /transform: scale\(var\(--polaroid-caption-visual-scale, 1\)\)/, 'caption layers must scale visually from the shared canonical text metrics')
 assert.match(appStyles, /width: var\(--polaroid-caption-content-width, 100%\)/, 'caption wrapping width must scale with the same canonical text metrics')
 assert.match(appStyles, /\.polaroid-date-text \{[^}]*--polaroid-date-font-size/, 'date text must scale from the same canonical typography contract')
+assert.match(appStyles, /\.polaroid-date-text \{[^}]*display: flex; align-items: center; justify-content: flex-end;/, 'date text must center within the shared lower-right date slot')
+assert.match(appStyles, /\.polaroid-date-text \{[^}]*transform-origin: center right;/, 'date text must stay anchored to the lower-right date slot while scaling')
 assert.match(appStyles, /\.film-picker-heading strong,\s*\.film-picker-current,\s*\.film-option-name \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/)
 
 console.log('Film challenge UI: Rainbow Studio only lists unlocked films, keeps challenge notices in the bookmark, and supports anchored radius controls.')
