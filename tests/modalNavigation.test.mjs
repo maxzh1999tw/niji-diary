@@ -38,6 +38,7 @@ for (const modalId of [
   'rainbow-lightbox',
   'delete-confirmation',
   'developed-card',
+  'compose-screen',
 ]) {
   assert.match(appSource, new RegExp(`useModalHistory\\([^\\n]+'${modalId}'`), `${modalId} must use the shared back-stack`)
 }

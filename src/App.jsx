@@ -2039,6 +2039,7 @@ export default function App() {
   const closeSelectedDay = useModalHistory(Boolean(selectedDay), 'rainbow-lightbox', () => setSelectedDay(null))
   const closePendingDelete = useModalHistory(Boolean(pendingDelete), 'delete-confirmation', () => setPendingDelete(null))
   const closeDevelopedDay = useModalHistory(Boolean(developedDay), 'developed-card', () => setDevelopedDay(null))
+  useModalHistory(Boolean(composing), 'compose-screen', () => exitCompose())
 
   function showMessage(text) {
     clearTimeout(messageTimer.current)
@@ -2379,6 +2380,7 @@ export default function App() {
       setHistory(nextHistory)
       setFilmCollection(nextFilmCollection)
       if (nextFilmNotifications.length) setFilmNotifications((current) => [...current, ...nextFilmNotifications])
+      clearCurrentModalHistory()
       setDevelopedDay(completedDay)
       setComposing(false)
       setBackground(null)
