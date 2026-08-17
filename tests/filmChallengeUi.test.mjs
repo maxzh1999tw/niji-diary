@@ -20,6 +20,10 @@ assert.match(appSource, /function FilmPicker\(\{ selectedFilmId, selectedLayoutI
 assert.match(appSource, /const availableFilms = FILMS\.filter\(\(film\) => unlockedFilmIds\.includes\(film\.id\)\)/)
 assert.match(appSource, /function FilmLayoutChoices\(/)
 assert.match(appSource, /<FilmLayoutChoices filmId=\{selectedFilm\.id\} selectedLayoutId=\{selectedLayoutId\}/)
+assert.match(appSource, /function PolaroidMediaLayout[\s\S]*?const geometry = getPolaroidLayoutGeometry\(layoutId\)/, 'full card previews must consume the shared layout geometry')
+assert.match(appSource, /function LayoutThumbnail[\s\S]*?const geometry = getPolaroidLayoutGeometry\(layoutId\)/, 'layout thumbnails must consume the same shared layout geometry')
+assert.match(appSource, /const \{ photo, sourceRects \} = renderModel\.geometry/, 'canvas export must consume the render model geometry')
+assert.doesNotMatch(appSource, /mosaic-source-row|mosaic-source-column|mosaic-body/, 'layout geometry must not be duplicated as special-case JSX')
 assert.doesNotMatch(appSource.slice(appSource.indexOf('function FilmPicker('), appSource.indexOf('function PolaroidCard')), /film-picker-current/, 'Rainbow Studio must use layout thumbnails instead of repeating the selected film name')
 assert.match(appSource, /scopeFilmRenderSvg\(svg, scope\)/)
 assert.match(appSource, /scopeFilmRenderSvg\(overlaySvg, scope\)/)
@@ -48,6 +52,7 @@ assert.match(appStyles, /\.film-picker-options \{ width: 100%; max-width: 100%; 
 assert.match(appStyles, /\.film-picker-options \{\s*scrollbar-color: transparent transparent;/)
 assert.match(appStyles, /\.film-picker-options\.is-scrolling \{\s*scrollbar-color: var\(--purple\) transparent;/)
 assert.match(appStyles, /\.film-surface-artwork > svg,\s*\.film-surface-overlay > svg \{ width: 100%; height: 100%; display: block; \}/)
+assert.doesNotMatch(appStyles, /layout-thumbnail-(?:classic|mosaic-seven)|mosaic-source-row|mosaic-source-column|mosaic-body/, 'CSS must not maintain a second hard-coded copy of layout geometry')
 assert.match(appStyles, /\.film-picker-heading strong,\s*\.film-picker-current,\s*\.film-option-name \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/)
 
 console.log('Film challenge UI: Rainbow Studio only lists unlocked films, keeps challenge notices in the bookmark, and supports anchored radius controls.')

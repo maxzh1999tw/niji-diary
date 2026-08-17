@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getSupportedFilmLayoutIds, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from './films.js'
-import { getFilmRenderModel, getPolaroidLayoutStyle, getPolaroidSourceRects, scopeFilmRenderSvg } from './filmRendering.js'
+import { getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, scopeFilmRenderSvg } from './filmRendering.js'
 import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
 import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
 import { formatText, translations } from './i18n.js'
@@ -240,7 +240,8 @@ async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = 
   if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
   await document.fonts?.ready
   const renderModel = getFilmRenderModel(day.filmId, day.layoutId)
-  const { width, height, photo } = renderModel.layout
+  const { width, height } = renderModel.layout
+  const { photo, sourceRects } = renderModel.geometry
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -259,7 +260,6 @@ async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = 
   context.lineWidth = 2
   context.strokeRect(photo.x, photo.y, photo.width, photo.height)
 
-  const sourceRects = getPolaroidSourceRects(renderModel.layout)
   const sourceImages = await Promise.all(COLOR_KEYS.map(async (key) => {
     if (!day.photos?.[key]) return null
     try { return await loadImageSource(day.photos[key]) } catch { return null }
@@ -498,27 +498,25 @@ function EnergyStrip({ photos, samples = {}, labels, interactive = false, onSele
   )
 }
 
-function PolaroidSourcePhoto({ colorKey, photos, samples, label, imageLoading }) {
-  return <div className={`polaroid-source-photo source-${colorKey}`} style={{ '--sample': samples[colorKey] || FALLBACK_COLORS[colorKey] }}>
-    {photos[colorKey] ? <img src={photos[colorKey]} alt={label} loading={imageLoading} /> : <i aria-hidden="true" />}
+function PolaroidSourcePhoto({ colorKey, geometry, photos, samples, label, imageLoading }) {
+  const sample = samples[colorKey] || FALLBACK_COLORS[colorKey]
+  return <div className={`polaroid-source-photo source-${colorKey}`} style={{ ...geometry.cardStyle, '--sample': sample }}>
+    <span className="polaroid-source-image" style={geometry.imageCardStyle}>
+      {photos[colorKey] ? <img src={photos[colorKey]} alt={label} loading={imageLoading} /> : <i aria-hidden="true" />}
+    </span>
+    <i className="polaroid-source-accent" style={geometry.accentCardStyle} aria-hidden="true" />
   </div>
 }
 
 function PolaroidMediaLayout({ layoutId, mainPhoto, photos = {}, samples = {}, labels, imageLoading = 'lazy' }) {
-  const sourcePhoto = (key, index) => <PolaroidSourcePhoto key={key} colorKey={key} photos={photos} samples={samples} label={labels[index]} imageLoading={imageLoading} />
-  if (layoutId === MOSAIC_LAYOUT_ID) {
-    return <div className="polaroid-media-layout mosaic-media-layout">
-      <div className="mosaic-source-row" aria-label={labels.slice(0, 3).join('、')}>{COLOR_KEYS.slice(0, 3).map(sourcePhoto)}</div>
-      <div className="mosaic-body">
-        <div className="mosaic-source-column" aria-label={labels.slice(3, 5).join('、')}>{COLOR_KEYS.slice(3, 5).map((key, index) => sourcePhoto(key, index + 3))}</div>
-        {mainPhoto}
-        <div className="mosaic-source-column" aria-label={labels.slice(5).join('、')}>{COLOR_KEYS.slice(5).map((key, index) => sourcePhoto(key, index + 5))}</div>
-      </div>
+  const geometry = getPolaroidLayoutGeometry(layoutId)
+  return <div className="polaroid-media-layout" style={geometry.mediaStyle}>
+    <div className="polaroid-main-slot" style={geometry.photoCardStyle}>
+      {mainPhoto}
     </div>
-  }
-  return <div className="polaroid-media-layout classic-media-layout">
-    {mainPhoto}
-    <div className="polaroid-sources" aria-label={labels.join('、')}>{COLOR_KEYS.map(sourcePhoto)}</div>
+    <div className="polaroid-layout-sources" aria-label={labels.join('、')}>
+      {COLOR_KEYS.map((key, index) => <PolaroidSourcePhoto key={key} colorKey={key} geometry={geometry.sources[index]} photos={photos} samples={samples} label={labels[index]} imageLoading={imageLoading} />)}
+    </div>
   </div>
 }
 
@@ -655,10 +653,11 @@ function FilmProgressBookmark({ notification, lang, t, offsetForNavigation, onDi
 }
 
 function LayoutThumbnail({ layoutId }) {
-  return <span className={`layout-thumbnail layout-thumbnail-${layoutId}`} aria-hidden="true">
-    <i className="layout-thumbnail-main" />
-    <span className="layout-thumbnail-sources">{COLOR_KEYS.map((key) => <i key={key} />)}</span>
-    <i className="layout-thumbnail-caption" />
+  const geometry = getPolaroidLayoutGeometry(layoutId)
+  return <span className="layout-thumbnail" aria-hidden="true">
+    <i className="layout-thumbnail-main" style={geometry.photoThumbnailStyle} />
+    <span className="layout-thumbnail-sources">{geometry.sources.map((source, index) => <i key={COLOR_KEYS[index]} style={source.thumbnailStyle} />)}</span>
+    <i className="layout-thumbnail-caption" style={geometry.captionThumbnailStyle} />
   </span>
 }
 

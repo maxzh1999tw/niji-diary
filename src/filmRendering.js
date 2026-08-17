@@ -4,6 +4,7 @@ export const POLAROID_LAYOUT = Object.freeze({
   id: DEFAULT_LAYOUT_ID,
   width: 1000,
   height: 1500,
+  mediaHeight: 1336.5,
   photo: Object.freeze({ x: 35, y: 35, width: 930, height: 1162.5 }),
   sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
@@ -13,17 +14,18 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
   id: MOSAIC_LAYOUT_ID,
   width: 1000,
   height: 1500,
-  photo: Object.freeze({ x: 325.25, y: 516.5625, width: 349.5, height: 436.875 }),
+  mediaHeight: 1336.5,
+  photo: Object.freeze({ x: 277, y: 270, width: 681, height: 851.25 }),
   sourceRects: Object.freeze([
-    Object.freeze({ x: 42, y: 35, width: 285.3333, height: 220 }),
-    Object.freeze({ x: 357.3333, y: 35, width: 285.3334, height: 220 }),
-    Object.freeze({ x: 672.6667, y: 35, width: 285.3333, height: 220 }),
-    Object.freeze({ x: 42, y: 295, width: 253.25, height: 420 }),
-    Object.freeze({ x: 42, y: 755, width: 253.25, height: 420 }),
-    Object.freeze({ x: 704.75, y: 295, width: 253.25, height: 420 }),
-    Object.freeze({ x: 704.75, y: 755, width: 253.25, height: 420 }),
+    Object.freeze({ x: 42, y: 35, width: 211, height: 211 }),
+    Object.freeze({ x: 277, y: 35, width: 211, height: 211 }),
+    Object.freeze({ x: 512, y: 35, width: 211, height: 211 }),
+    Object.freeze({ x: 747, y: 35, width: 211, height: 211 }),
+    Object.freeze({ x: 42, y: 270, width: 211, height: 211 }),
+    Object.freeze({ x: 42, y: 505, width: 211, height: 211 }),
+    Object.freeze({ x: 42, y: 740, width: 211, height: 211 }),
   ]),
-  sourceFrame: Object.freeze({ innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 }),
+  sourceFrame: Object.freeze({ innerX: 7, innerY: 7, innerBottom: 7, accentHeight: 8 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })
 
@@ -36,24 +38,104 @@ export function getPolaroidLayout(layoutId) {
   return POLAROID_LAYOUTS[layoutId] ?? POLAROID_LAYOUT
 }
 
+const sourceRectsCache = new WeakMap()
+
 export function getPolaroidSourceRects(layoutOrId = DEFAULT_LAYOUT_ID) {
   const layout = typeof layoutOrId === 'object' && layoutOrId ? layoutOrId : getPolaroidLayout(layoutOrId)
+  const cached = sourceRectsCache.get(layout)
+  if (cached) return cached
+  let sourceRects
   if (Array.isArray(layout.sourceRects)) {
     const frame = layout.sourceFrame
-    return layout.sourceRects.map((rect) => ({ ...frame, ...rect }))
+    sourceRects = layout.sourceRects.map((rect) => Object.freeze({ ...frame, ...rect }))
+  } else {
+    const { sources } = layout
+    const sourceWidth = (sources.width - sources.gap * 6) / 7
+    sourceRects = Array.from({ length: 7 }, (_, index) => Object.freeze({
+      x: sources.x + index * (sourceWidth + sources.gap),
+      y: sources.y,
+      width: sourceWidth,
+      height: sources.height,
+      innerX: sources.innerX,
+      innerY: sources.innerY,
+      innerBottom: sources.innerBottom,
+      accentHeight: sources.accentHeight,
+    }))
   }
-  const { sources } = layout
-  const sourceWidth = (sources.width - sources.gap * 6) / 7
-  return Array.from({ length: 7 }, (_, index) => ({
-    x: sources.x + index * (sourceWidth + sources.gap),
-    y: sources.y,
-    width: sourceWidth,
-    height: sources.height,
-    innerX: sources.innerX,
-    innerY: sources.innerY,
-    innerBottom: sources.innerBottom,
-    accentHeight: sources.accentHeight,
-  }))
+  const immutableSourceRects = Object.freeze(sourceRects)
+  sourceRectsCache.set(layout, immutableSourceRects)
+  return immutableSourceRects
+}
+
+const layoutGeometryCache = new WeakMap()
+
+function cardRectStyle(rect, layoutWidth) {
+  const toCqw = (value) => `${Number((value / layoutWidth * 100).toFixed(6))}cqw`
+  return Object.freeze({
+    left: toCqw(rect.x),
+    top: toCqw(rect.y),
+    width: toCqw(rect.width),
+    height: toCqw(rect.height),
+  })
+}
+
+function thumbnailRectStyle(rect, layout) {
+  const toPercent = (value, total) => `${Number((value / total * 100).toFixed(6))}%`
+  return Object.freeze({
+    left: toPercent(rect.x, layout.width),
+    top: toPercent(rect.y, layout.height),
+    width: toPercent(rect.width, layout.width),
+    height: toPercent(rect.height, layout.height),
+  })
+}
+
+export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
+  const layout = typeof layoutOrId === 'object' && layoutOrId ? layoutOrId : getPolaroidLayout(layoutOrId)
+  const cached = layoutGeometryCache.get(layout)
+  if (cached) return cached
+
+  const sourceRects = getPolaroidSourceRects(layout)
+  const sources = sourceRects.map((rect) => {
+    const imageRect = Object.freeze({
+      x: rect.x + rect.innerX,
+      y: rect.y + rect.innerY,
+      width: rect.width - rect.innerX * 2,
+      height: rect.height - rect.innerY - rect.innerBottom,
+    })
+    const accentRect = Object.freeze({
+      x: rect.x,
+      y: rect.y + rect.height - rect.accentHeight,
+      width: rect.width,
+      height: rect.accentHeight,
+    })
+    return Object.freeze({
+      rect,
+      imageRect,
+      accentRect,
+      cardStyle: cardRectStyle(rect, layout.width),
+      imageCardStyle: cardRectStyle({ x: rect.innerX, y: rect.innerY, width: imageRect.width, height: imageRect.height }, layout.width),
+      accentCardStyle: cardRectStyle({ x: 0, y: rect.height - rect.accentHeight, width: rect.width, height: rect.accentHeight }, layout.width),
+      thumbnailStyle: thumbnailRectStyle(rect, layout),
+    })
+  })
+  const captionRect = Object.freeze({
+    x: layout.footer.x,
+    y: layout.footer.textY - 22,
+    width: layout.width - layout.footer.x * 2 - layout.footer.dateWidth,
+    height: 14,
+  })
+  const geometry = Object.freeze({
+    layout,
+    photo: layout.photo,
+    sourceRects,
+    sources: Object.freeze(sources),
+    mediaStyle: Object.freeze({ height: `${Number((layout.mediaHeight / layout.width * 100).toFixed(6))}cqw` }),
+    photoCardStyle: cardRectStyle(layout.photo, layout.width),
+    photoThumbnailStyle: thumbnailRectStyle(layout.photo, layout),
+    captionThumbnailStyle: thumbnailRectStyle(captionRect, layout),
+  })
+  layoutGeometryCache.set(layout, geometry)
+  return geometry
 }
 
 const PAPER_STOPS = Object.freeze([
@@ -133,9 +215,11 @@ export function getFilmRenderModel(filmId, layoutId = DEFAULT_LAYOUT_ID) {
 
   const svg = createFilmSurfaceSvg(film.id)
   const overlaySvg = createFilmOverlaySvg(film.id, layout.id)
+  const geometry = getPolaroidLayoutGeometry(layout)
   const model = Object.freeze({
     film,
     layout,
+    geometry,
     svg,
     overlaySvg,
     surfaceUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
@@ -145,8 +229,12 @@ export function getFilmRenderModel(filmId, layoutId = DEFAULT_LAYOUT_ID) {
   return model
 }
 
+const layoutStyleCache = new WeakMap()
+
 export function getPolaroidLayoutStyle(layoutId = DEFAULT_LAYOUT_ID) {
   const layout = getPolaroidLayout(layoutId)
+  const cached = layoutStyleCache.get(layout)
+  if (cached) return cached
   const { width, photo, footer } = layout
   const toCqw = (value) => `${Number((value / width * 100).toFixed(4))}cqw`
   const style = {
@@ -165,5 +253,7 @@ export function getPolaroidLayoutStyle(layoutId = DEFAULT_LAYOUT_ID) {
       '--polaroid-source-accent': toCqw(layout.sources.accentHeight),
     })
   }
-  return style
+  const immutableStyle = Object.freeze(style)
+  layoutStyleCache.set(layout, immutableStyle)
+  return immutableStyle
 }

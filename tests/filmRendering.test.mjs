@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, FILMS, MOSAIC_LAYOUT_ID } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -24,17 +24,38 @@ assert.equal(layoutStyle['--polaroid-footer-x'], '5%')
 
 const mosaicLayout = getPolaroidLayout(MOSAIC_LAYOUT_ID)
 const mosaicSources = getPolaroidSourceRects(mosaicLayout)
+const mosaicGeometry = getPolaroidLayoutGeometry(mosaicLayout)
 const classicSources = getPolaroidSourceRects(POLAROID_LAYOUT)
 assert.equal(mosaicLayout, MOSAIC_POLAROID_LAYOUT)
 assert.equal(mosaicLayout.photo.width / mosaicLayout.photo.height, 4 / 5, 'the new layout must preserve the main photo ratio')
 assert.equal(mosaicSources.length, 7)
-assert.deepEqual(mosaicSources.slice(0, 3).map(({ y }) => y), [35, 35, 35], 'the first three color photos must form one horizontal row')
-assert.deepEqual(mosaicSources.slice(3, 5).map(({ x }) => x), [42, 42], 'the next two color photos must stack on the left')
-assert.deepEqual(mosaicSources.slice(5).map(({ x }) => x), [704.75, 704.75], 'the last two color photos must stack on the right')
+assert.deepEqual(mosaicSources.slice(0, 4).map(({ x, y }) => [x, y]), [[42, 35], [277, 35], [512, 35], [747, 35]], 'the first four color photos must form one horizontal row')
+assert.deepEqual(mosaicSources.slice(4).map(({ x, y }) => [x, y]), [[42, 270], [42, 505], [42, 740]], 'the final three color photos must stack on the left')
+assert.ok(mosaicSources.every(({ width, height }) => width === height), 'all seven color-photo frames must be square')
+assert.ok(mosaicGeometry.sources.every(({ imageRect }) => imageRect.width === imageRect.height), 'all seven visible color-photo areas must be square')
 assert.ok(mosaicSources.every((source, index) => source.width > classicSources[index].width), 'all color photos must be larger than in the classic layout')
-assert.ok(mosaicLayout.photo.width > mosaicSources[3].width && mosaicLayout.photo.height > mosaicSources[3].height, 'the main photo must remain slightly larger than one color photo')
+assert.equal(mosaicLayout.photo.x, mosaicSources[1].x, 'the main photo must align below the second tile to form the inner corner')
+assert.equal(mosaicLayout.photo.y, mosaicSources[4].y, 'the main photo and left column must start on the same row')
+assert.ok(mosaicLayout.photo.width > mosaicSources[0].width && mosaicLayout.photo.height > mosaicSources[0].height, 'the main photo must remain larger than one color photo')
+assert.equal(mosaicGeometry.sourceRects, mosaicSources, 'DOM, thumbnail, and export geometry must reuse the same immutable source rectangles')
+assert.equal(getPolaroidLayoutGeometry(MOSAIC_LAYOUT_ID), mosaicGeometry, 'layout geometry must be cached as one immutable render contract')
+assert.equal(mosaicGeometry.photo, mosaicLayout.photo)
+assert.deepEqual(mosaicGeometry.photoCardStyle, { left: '27.7cqw', top: '27cqw', width: '68.1cqw', height: '85.125cqw' })
+assert.deepEqual(mosaicGeometry.photoThumbnailStyle, { left: '27.7%', top: '18%', width: '68.1%', height: '56.75%' })
+const assertClose = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.000001, message)
+mosaicGeometry.sources.forEach(({ rect, cardStyle, thumbnailStyle }, index) => {
+  assertClose(Number.parseFloat(cardStyle.left), rect.x / mosaicLayout.width * 100, `card source ${index + 1} x must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(cardStyle.top), rect.y / mosaicLayout.width * 100, `card source ${index + 1} y must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(cardStyle.width), rect.width / mosaicLayout.width * 100, `card source ${index + 1} width must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(cardStyle.height), rect.height / mosaicLayout.width * 100, `card source ${index + 1} height must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(thumbnailStyle.left), rect.x / mosaicLayout.width * 100, `thumbnail source ${index + 1} x must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(thumbnailStyle.top), rect.y / mosaicLayout.height * 100, `thumbnail source ${index + 1} y must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(thumbnailStyle.width), rect.width / mosaicLayout.width * 100, `thumbnail source ${index + 1} width must derive from the shared rectangle`)
+  assertClose(Number.parseFloat(thumbnailStyle.height), rect.height / mosaicLayout.height * 100, `thumbnail source ${index + 1} height must derive from the shared rectangle`)
+})
 assert.notEqual(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID), getFilmRenderModel(DEFAULT_FILM_ID), 'render models must be cached per film and layout')
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).layout, MOSAIC_POLAROID_LAYOUT)
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).geometry, mosaicGeometry)
 
 for (const film of FILMS) {
   const model = getFilmRenderModel(film.id)

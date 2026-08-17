@@ -148,23 +148,22 @@ img { max-width: 100%; }
 .archive-card { position: relative; min-width: 0; padding: 6px; border: 0; border-radius: 6px; background: transparent; box-shadow: none; cursor: pointer; text-align: left; transition: transform .2s var(--ease-spring); }.archive-card:hover { transform: translateY(-3px) rotate(-.35deg); }.archive-card:nth-child(even):hover { transform: translateY(-3px) rotate(.35deg); }.archive-card:active { transform: translateY(-1px) scale(.985); }.archive-card:focus-visible { outline: 3px solid var(--purple); outline-offset: 1px; box-shadow: none; }.archive-card .rainbow-strip > * { height: 82px; }
 .archive-card { touch-action: pan-y; }.archive-card, .archive-card *, .archive-delete-polaroid, .archive-delete-polaroid * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }.archive-card img, .archive-delete-polaroid img { -webkit-user-drag: none; user-drag: none; }
 .archive-delete-overlay { position: fixed; z-index: 240; inset: 0; display: grid; place-items: center; padding: max(18px, env(safe-area-inset-top)) 18px calc(128px + env(safe-area-inset-bottom)); overflow: hidden; background: rgba(9,8,12,.8); backdrop-filter: blur(9px); }.archive-delete-dismiss { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-out; }.archive-delete-dialog { position: relative; z-index: 1; width: min(380px, 100%); display: grid; place-items: center; outline: 0; }.archive-delete-polaroid { --drag-x: 0px; --drag-y: 0px; --trash-origin-x: 50%; --trash-origin-y: 120%; position: relative; z-index: 3; width: min(360px, 100%); cursor: grab; touch-action: none; opacity: 1; transform: translate3d(var(--drag-x), var(--drag-y), 0) rotate(-.7deg); transform-origin: center; filter: drop-shadow(0 22px 28px rgba(0,0,0,.42)); will-change: transform, opacity; animation: drag-preview-arrive .2s ease-out both; }.archive-delete-polaroid:active { cursor: grabbing; }.archive-delete-polaroid.settling { transition: transform .24s var(--ease-spring); }.archive-delete-polaroid .polaroid-card { opacity: 1; transform: scale(1) rotate(0); transform-origin: var(--trash-origin-x) var(--trash-origin-y); box-shadow: 0 3px 6px rgba(24,18,29,.22), 0 24px 48px rgba(24,18,29,.42); transition: transform .3s cubic-bezier(.2,1.35,.35,1), opacity .16s ease-out, filter .18s ease; will-change: transform, opacity; }.archive-delete-polaroid.over-trash .polaroid-card { opacity: 0; transform: scale(.04) rotate(8deg); filter: saturate(.5) brightness(.78); transition: transform .2s cubic-bezier(.55,.02,.85,.42), opacity .15s .05s ease-in, filter .16s ease-in; }.archive-delete-polaroid.discarding { z-index: 1; cursor: default; pointer-events: none; opacity: 0; transform: translate3d(var(--drag-x), var(--drag-y), 0) rotate(14deg) scale(.06); filter: blur(2px) drop-shadow(0 3px 4px rgba(0,0,0,.2)); animation: none; transition: transform .34s cubic-bezier(.55,.02,.85,.42), opacity .2s .12s ease-in, filter .26s ease-in; }.album-delete-tray { position: fixed; z-index: 2; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); min-width: 190px; min-height: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 8px 22px; border: 3px solid var(--ink); border-radius: 26px; background: rgba(255,255,255,.97); color: var(--ink); box-shadow: 6px 6px 0 var(--ink), 0 16px 30px rgba(30,14,40,.3); cursor: pointer; transform: translateX(-50%); animation: delete-tray-arrive .2s ease-out both; transition: background-color .16s ease, color .16s ease, box-shadow .16s ease, transform .16s var(--ease-spring); }.album-trash-icon { width: 50px; height: 50px; display: grid; place-items: center; border: 3px solid var(--ink); border-radius: 50%; background: var(--pink); transition: transform .16s var(--ease-spring), background-color .16s ease; }.album-delete-tray strong { font: 800 12px/1.1 'Fredoka', 'Noto Sans TC', sans-serif; }.album-delete-tray:disabled { cursor: default; }.album-delete-tray:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }.album-delete-tray.over-trash { background: #ff4d68; color: white; box-shadow: 6px 6px 0 var(--ink), 0 0 0 7px rgba(255,77,104,.24), 0 18px 34px rgba(74,8,24,.36); transform: translateX(-50%) scale(1.05); }.album-delete-tray.over-trash .album-trash-icon { background: white; color: #b80024; transform: scale(1.1) rotate(-7deg); }.album-delete-tray.accepting .album-trash-icon { animation: trash-accept .36s var(--ease-spring) both; }
-.polaroid-card { position: relative; width: 100%; aspect-ratio: 2/3; display: grid; grid-template-rows: auto minmax(0, 1fr); box-sizing: border-box; overflow: hidden; padding: 0; border: 1px solid rgba(43, 35, 49, .16); border-radius: 2px; background: var(--film-paper-fallback, #fdfcf9); box-shadow: 0 2px 4px rgba(24, 18, 29, .18), 0 14px 28px rgba(24, 18, 29, .24); container-type: inline-size; isolation: isolate; }
+.polaroid-card { position: relative; width: 100%; aspect-ratio: 2/3; display: grid; grid-template-rows: auto minmax(0, 1fr); box-sizing: border-box; overflow: hidden; padding: 0; border: 0; border-radius: 2px; background: var(--film-paper-fallback, #fdfcf9); box-shadow: inset 0 0 0 1px rgba(43, 35, 49, .16), 0 2px 4px rgba(24, 18, 29, .18), 0 14px 28px rgba(24, 18, 29, .24); container-type: inline-size; isolation: isolate; }
 .film-surface-artwork { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; }
 .polaroid-media-layout { position: relative; z-index: 1; min-width: 0; }
-.classic-media-layout .polaroid-photo { width: auto; height: auto; margin: var(--polaroid-photo-y, 3.5cqw) var(--polaroid-photo-x, 3.5cqw) 0; }
-.polaroid-photo { position: relative; z-index: 1; min-width: 0; min-height: 0; aspect-ratio: var(--polaroid-photo-aspect, 4/5); overflow: hidden; background: #e8e1ec; box-shadow: inset 0 0 0 1px rgba(18, 13, 21, .08); }
+.polaroid-main-slot, .polaroid-source-photo { position: absolute; }
+.polaroid-main-slot > .polaroid-photo { width: 100%; height: 100%; }
+.polaroid-photo { position: relative; z-index: 1; min-width: 0; min-height: 0; overflow: hidden; background: #e8e1ec; box-shadow: inset 0 0 0 1px rgba(18, 13, 21, .08); }
 .polaroid-photo > img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .polaroid-photo > .rainbow-strip { height: 100%; }
 .polaroid-photo > .rainbow-strip > * { height: 100%; border-width: 0 1px 0 0; border-radius: 0; box-shadow: none; }
-.polaroid-sources { position: relative; z-index: 1; height: var(--polaroid-source-height, 11.5cqw); display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--polaroid-source-gap, 1.15cqw); margin: var(--polaroid-source-y, 2.4cqw) var(--polaroid-source-x, 4.2cqw) 0; }
-.polaroid-source-photo { position: relative; min-width: 0; min-height: 0; overflow: hidden; padding: var(--polaroid-source-padding, .7cqw); border: 1px solid rgba(69, 60, 67, .18); border-bottom: var(--polaroid-source-accent, .8cqw) solid var(--sample); background: #fffefa; box-shadow: 0 .7cqw 1.4cqw rgba(35, 28, 38, .12); }
-.polaroid-source-photo img, .polaroid-source-photo > i { width: 100%; height: 100%; display: block; object-fit: cover; background: var(--sample); }
-.mosaic-media-layout { height: 114cqw; display: grid; grid-template-rows: 22cqw 88cqw; gap: 4cqw; margin: 3.5cqw 4.2cqw 0; }
-.mosaic-source-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3cqw; }
-.mosaic-body { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 1.38fr minmax(0, 1fr); align-items: stretch; gap: 3cqw; }
-.mosaic-source-column { min-width: 0; min-height: 0; display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4cqw; }
-.mosaic-body > .polaroid-photo { width: 100%; align-self: center; margin: 0; }
-.mosaic-media-layout .polaroid-source-photo img { object-fit: contain; }
+.polaroid-layout-sources { position: absolute; inset: 0; }
+.polaroid-source-photo { z-index: 1; min-width: 0; min-height: 0; overflow: hidden; background: #fffefa; box-shadow: inset 0 0 0 1px rgba(69, 60, 67, .18), 0 .7cqw 1.4cqw rgba(35, 28, 38, .12); }
+.polaroid-source-image, .polaroid-source-accent { position: absolute; display: block; }
+.polaroid-source-image { overflow: hidden; background: var(--sample); }
+.polaroid-source-image img, .polaroid-source-image > i { width: 100%; height: 100%; display: block; object-fit: cover; background: var(--sample); }
+.polaroid-source-accent { background: var(--sample); }
+.layout-mosaic-seven .polaroid-source-image img { object-fit: contain; }
 .polaroid-footer { position: relative; z-index: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4%; padding: 0 var(--polaroid-footer-x, 5%); }
 .polaroid-caption-slot { min-width: 0; height: 46%; display: flex; align-items: center; justify-content: flex-start; }
 .polaroid-caption-text, .polaroid-caption-input { width: 100%; overflow: hidden; color: var(--film-ink, var(--ink)); font: 600 max(12px, 4.5cqw)/1.15 'Fredoka', 'Noto Sans TC', sans-serif; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
@@ -187,27 +186,17 @@ img { max-width: 100%; }
 .film-layout-choices button:active { transform: translateY(1px); }
 .film-layout-choices button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .film-layout-choices button.selected { border-color: var(--ink); background: #fff4fb; box-shadow: 3px 3px 0 var(--ink); }
-.layout-thumbnail { position: relative; width: 28px; height: 38px; display: block; overflow: hidden; border: 1.5px solid currentColor; border-radius: 1px; background: #fffefa; color: inherit; }
+.layout-thumbnail { position: relative; width: 28px; aspect-ratio: 2/3; display: block; overflow: hidden; border: 0; border-radius: 1px; background: #fffefa; color: inherit; box-shadow: inset 0 0 0 1.5px currentColor; }
 .layout-thumbnail-main, .layout-thumbnail-sources > i, .layout-thumbnail-caption { position: absolute; display: block; border: 1px solid currentColor; background: #dcecf1; }
-.layout-thumbnail-caption { left: 3px; right: 9px; bottom: 2px; height: 2px; border: 0; border-radius: 999px; background: currentColor; }
-.layout-thumbnail-classic .layout-thumbnail-main { inset: 2px 2px 9px; }
-.layout-thumbnail-classic .layout-thumbnail-sources { position: absolute; right: 2px; bottom: 5px; left: 2px; height: 3px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
-.layout-thumbnail-classic .layout-thumbnail-sources > i { position: relative; border-width: .5px; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-main { z-index: 1; top: 15px; left: 9px; width: 10px; height: 13px; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources { position: absolute; inset: 2px 2px 8px; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: 7px repeat(2, 8px); gap: 1px; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i { position: relative; border-width: .5px; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(1) { grid-column: 1 / 3; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(2) { grid-column: 3 / 5; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(3) { grid-column: 5 / 7; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(4) { grid-column: 1 / 3; grid-row: 2; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(5) { grid-column: 1 / 3; grid-row: 3; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(6) { grid-column: 5 / 7; grid-row: 2; }
-.layout-thumbnail-mosaic-seven .layout-thumbnail-sources > i:nth-child(7) { grid-column: 5 / 7; grid-row: 3; }
+.layout-thumbnail-main { z-index: 1; }
+.layout-thumbnail-sources { position: absolute; inset: 0; }
+.layout-thumbnail-sources > i { border-width: .5px; }
+.layout-thumbnail-caption { border: 0; border-radius: 999px; background: currentColor; }
 .film-layout-support { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 12px; color: var(--ink-soft); }
 .film-layout-support > span { margin: 0; font-size: 12px; font-weight: 800; }
 .film-layout-support > div { display: flex; align-items: center; gap: 5px; }
 .film-layout-support-item { display: block; margin: 0; }
-.film-layout-support-item .layout-thumbnail { width: 23px; height: 31px; color: var(--ink-soft); }
+.film-layout-support-item .layout-thumbnail { width: 23px; color: var(--ink-soft); }
 
 .films-screen { min-height: 0; overflow-y: auto; padding: 28px clamp(22px, 5vw, 58px) 36px; }.films-screen .screen-title { margin: 0 auto 18px; }
 .film-collection-summary { max-width: 740px; min-height: 100px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; margin: 0 auto 18px; padding: 14px 18px; border: var(--border); border-radius: 20px; background: linear-gradient(110deg, #fff, #e9faff 52%, #fbe8ff); box-shadow: 5px 5px 0 var(--ink); }.film-collection-summary strong { display: block; font: 700 18px/1.15 'Fredoka', 'Noto Sans TC', sans-serif; }.film-collection-current > span { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 12px; font-weight: 800; }.film-count-orb { width: 58px; height: 58px; display: flex; align-items: baseline; justify-content: center; padding-top: 17px; border: 3px solid var(--ink); border-radius: 50%; background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }.film-count-orb b { font: 700 22px/1 'Fredoka', sans-serif; }.film-count-orb span { display: inline; margin: 0; color: var(--ink); font: 800 12px/1 'Fredoka', sans-serif; }
@@ -319,11 +308,11 @@ img { max-width: 100%; }
 }
 
 .film-picker, .film-picker-options { background: transparent; }
-.composition-canvas.polaroid-card { width: min(100%, 480px); width: min(100cqw, 66.6667cqh); aspect-ratio: 2/3; border: 1px solid rgba(43, 35, 49, .16); outline: 3px solid var(--ink); background: var(--film-paper-fallback, #fdfcf9); box-shadow: 0 14px 30px rgba(8, 4, 14, .38); }
+.composition-canvas.polaroid-card { width: min(100%, 480px); width: min(100cqw, 66.6667cqh); aspect-ratio: 2/3; border: 0; outline: 3px solid var(--ink); background: var(--film-paper-fallback, #fdfcf9); box-shadow: inset 0 0 0 1px rgba(43, 35, 49, .16), 0 14px 30px rgba(8, 4, 14, .38); }
 .composition-canvas-photo { min-width: 0; min-height: 0; background: #ccc; }.composition-canvas-photo > img { user-select: none; pointer-events: none; }
 
 @media (max-width: 760px) {
-  .composition-canvas.polaroid-card { border-width: 1px; box-shadow: 0 12px 24px rgba(8, 4, 14, .4); }
+  .composition-canvas.polaroid-card { box-shadow: inset 0 0 0 1px rgba(43, 35, 49, .16), 0 12px 24px rgba(8, 4, 14, .4); }
 }
 
 @media (prefers-reduced-motion: reduce) {
