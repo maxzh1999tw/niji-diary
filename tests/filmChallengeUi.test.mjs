@@ -31,6 +31,9 @@ assert.match(appSource, /const \{ photo, sourceRects \} = renderModel\.geometry/
 assert.match(appSource, /drawCoverAt\(context, sourceImages\[index\], innerX, innerY, innerWidth, innerHeight\)/, 'all source photos must use the same centered cover crop in canvas exports')
 assert.doesNotMatch(appSource, /drawContainAt|const drawSource =/, 'the mosaic layout must not diverge into a contain-only export path')
 assert.match(appSource, /wrapCanvasText\(context, caption, captionLayout\.width, captionLayout\.maxLines\)/, 'canvas captions must wrap within the shared caption geometry')
+assert.match(appSource, /context\.rect\(captionLayout\.x, captionLayout\.y, captionLayout\.width, captionLayout\.height\)/, 'canvas captions must be clipped to the shared caption geometry')
+assert.match(appSource, /context\.clip\(\)/, 'canvas captions must not paint outside the shared caption geometry')
+assert.match(appSource, /const POLAROID_CANVAS_FONT = .*Fredoka.*Noto Sans TC/, 'canvas captions must use the same font family as DOM captions')
 assert.match(appSource, /multiline=\{selectedLayoutId === MOSAIC_LAYOUT_ID\}/, 'the corner layout editor must enable multiline input')
 assert.match(appSource, /\? <textarea \{\.\.\.commonProps\} rows="4" \/>/, 'multiline captions must use a four-line textarea')
 assert.match(appSource, /const MAX_MULTILINE_CAPTION_LINES = 4/, 'multiline captions must expose a four-line input limit')
@@ -92,6 +95,8 @@ assert.match(appStyles, /\.film-layout-support-item \{[^}]*width: 36px;[^}]*min-
 assert.match(appStyles, /\.film-layout-support-item \.layout-thumbnail \{[^}]*width: 36px;/, 'additional layout thumbnails must be enlarged and shifted toward the divider')
 assert.doesNotMatch(appStyles, /\.editor-dock \{[^}]*box-shadow: [^;}]*rgba\(255,79,186/, 'the editor dock must not add a purple separator below the studio background')
 assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally within the shared slot')
+assert.match(appStyles, /--polaroid-caption-line-limit/, 'caption line height must be constrained by the shared line budget at small render sizes')
+assert.match(appStyles, /font: [^;]*\/max\(12px, min\(calc\(var\(--polaroid-caption-line-height/, 'caption text must cap its line height instead of clipping the final scaled line')
 assert.match(appStyles, /\.film-picker-heading strong,\s*\.film-picker-current,\s*\.film-option-name \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/)
 
 console.log('Film challenge UI: Rainbow Studio only lists unlocked films, keeps challenge notices in the bookmark, and supports anchored radius controls.')

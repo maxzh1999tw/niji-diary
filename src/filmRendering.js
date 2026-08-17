@@ -153,6 +153,7 @@ export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
     alignItems: layout.caption.verticalAlign === 'top' ? 'flex-start' : 'center',
     '--polaroid-caption-size': toCqw(layout.caption.fontSize),
     '--polaroid-caption-line-height': String(layout.caption.lineHeight / layout.caption.fontSize),
+    '--polaroid-caption-line-limit': toCqw(layout.caption.height / Math.max(1, layout.caption.maxLines ?? 1)),
   })
   const dateCardStyle = Object.freeze({
     ...cardRectStyle(layout.date, layout.width),

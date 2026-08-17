@@ -80,6 +80,7 @@ assert.equal(mosaicLayout.caption.maxLines, 4, 'the corner-layout caption must a
 assert.equal(mosaicGeometry.captionCardStyle.left, '31.8cqw')
 assert.equal(mosaicGeometry.captionCardStyle.top, '113.7cqw')
 assert.equal(mosaicGeometry.captionCardStyle.height, '25.2cqw')
+assert.equal(mosaicGeometry.captionCardStyle['--polaroid-caption-line-limit'], '6.3cqw', 'the mosaic caption line budget must derive from its shared four-line box')
 assert.deepEqual(mosaicGeometry.captionThumbnailStyle, { left: '31.8%', top: '75.8%', width: '64%', height: '16.8%' })
 const assertClose = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.000001, message)
 mosaicGeometry.sources.forEach(({ rect, cardStyle, thumbnailStyle }, index) => {

@@ -238,22 +238,29 @@ function wrapCanvasText(context, text, maxWidth, maxLines) {
   return lines
 }
 
+const POLAROID_CANVAS_FONT = '"Fredoka", "Noto Sans TC", "Segoe UI", sans-serif'
+
 function drawPolaroidCaption(context, day, fallbackCaption, layout, ink = DEFAULT_FILM_INK) {
   const { caption: captionLayout } = layout
   const caption = day.caption ?? fallbackCaption
+  context.save()
+  context.beginPath()
+  context.rect(captionLayout.x, captionLayout.y, captionLayout.width, captionLayout.height)
+  context.clip()
   context.textBaseline = 'middle'
   context.fillStyle = day.captionInk ?? ink
-  context.font = `600 ${captionLayout.fontSize}px "Noto Sans TC", "Segoe UI", sans-serif`
+  context.font = `600 ${captionLayout.fontSize}px ${POLAROID_CANVAS_FONT}`
   const lines = wrapCanvasText(context, caption, captionLayout.width, captionLayout.maxLines)
   const firstBaseline = captionLayout.baselineY ?? captionLayout.y + captionLayout.lineHeight / 2
   lines.forEach((line, index) => context.fillText(line, captionLayout.x, firstBaseline + index * captionLayout.lineHeight))
+  context.restore()
 }
 
 function drawPolaroidDate(context, day, lang, layout, ink = DEFAULT_FILM_INK_MUTED) {
   const { date } = layout
   context.textBaseline = 'middle'
   context.fillStyle = ink
-  context.font = `600 ${date.fontSize}px "Noto Sans TC", "Segoe UI", sans-serif`
+  context.font = `600 ${date.fontSize}px ${POLAROID_CANVAS_FONT}`
   context.textAlign = 'right'
   context.fillText(formatDate(day.date, lang, true), date.x + date.width, date.baselineY)
   context.textAlign = 'left'
