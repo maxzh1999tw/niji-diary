@@ -101,7 +101,8 @@ for (const film of FILMS) {
   const backgroundArtworkCount = film.artwork.filter((shape) => shape.layer !== 'foreground').length
   const foregroundArtworkCount = film.artwork.filter((shape) => shape.layer === 'foreground').length
   const surfaceShapeCount = (model.svg.match(/<(?:circle|ellipse|rect|path) /g) ?? []).length - 1
-  const overlayShapeCount = (model.overlaySvg.match(/<(?:circle|ellipse|rect|path) /g) ?? []).length - (foregroundArtworkCount ? 2 : 0)
+  const overlayMaskShapeCount = foregroundArtworkCount ? 2 + getPolaroidSourceRects(POLAROID_LAYOUT).length : 0
+  const overlayShapeCount = (model.overlaySvg.match(/<(?:circle|ellipse|rect|path) /g) ?? []).length - overlayMaskShapeCount
   assert.equal(model.film, film)
   assert.equal(model.layout, POLAROID_LAYOUT)
   assert.equal(model, getFilmRenderModel(film.id), `${film.id} should reuse one immutable render model`)
@@ -133,6 +134,7 @@ for (const film of FILMS) {
   const classicArtwork = getFilmArtwork(film, DEFAULT_LAYOUT_ID)
   const mosaicArtwork = getFilmArtwork(film, MOSAIC_LAYOUT_ID)
   const mosaicModel = getFilmRenderModel(film.id, MOSAIC_LAYOUT_ID)
+  const reusesClassicArtwork = ['letterpress-ochre', 'comet-orange', 'threefold-light'].includes(film.id)
   assert.equal(mosaicModel.layout, MOSAIC_POLAROID_LAYOUT, `${film.id} must resolve the mosaic layout`)
   assert.equal(mosaicModel.svg, createFilmSurfaceSvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic surface must use its layout artwork`)
   assert.equal(mosaicModel.overlaySvg, createFilmOverlaySvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic overlay must use its layout artwork`)
@@ -142,17 +144,30 @@ for (const film of FILMS) {
   assert.ok(mosaicArtwork.every(({ type }) => classicTypes.has(type)), `${film.id} mosaic artwork must reuse the classic visual vocabulary`)
   if (film.id === DEFAULT_FILM_ID) {
     assert.equal(mosaicArtwork.length, 0, 'classic white must stay completely undecorated in the mosaic layout')
+  } else if (reusesClassicArtwork) {
+    assert.equal(mosaicArtwork, classicArtwork, `${film.id} must reuse the classic artwork positions in the mosaic layout`)
+    assert.equal(mosaicModel.svg, getFilmRenderModel(film.id, DEFAULT_LAYOUT_ID).svg, `${film.id} mosaic must reuse the classic background artwork exactly`)
   } else {
     const anchors = mosaicArtwork.map(artworkAnchor).filter(Boolean)
     assert.ok(anchors.some(({ x, y }) => x >= 840 && y <= 310), `${film.id} mosaic artwork must retain a top-right asymmetric motif`)
-    if (film.id !== 'threefold-light') {
-      assert.ok(mosaicArtwork.length >= 7, `${film.id} mosaic artwork must distribute several decorative details across the card`)
-      assert.ok(anchors.some(({ x }) => x <= 80), `${film.id} mosaic artwork must use the left-side whitespace`)
-      assert.ok(anchors.some(({ x, y }) => x >= 318 && y >= 1137), `${film.id} mosaic artwork must use the caption area`)
-      assert.ok(anchors.some(({ x, y }) => x >= 293 && x <= 317 && y >= 35 && y <= 1111), `${film.id} mosaic artwork must use the narrow layout gap`)
+    assert.ok(mosaicArtwork.length >= 7, `${film.id} mosaic artwork must distribute several decorative details across the card`)
+    assert.ok(anchors.some(({ x }) => x <= 80), `${film.id} mosaic artwork must use the left-side whitespace`)
+    assert.ok(anchors.some(({ x, y }) => x >= 318 && y >= 1137), `${film.id} mosaic artwork must use the caption area`)
+    assert.ok(anchors.some(({ x, y }) => x >= 293 && x <= 317 && y >= 35 && y <= 1111), `${film.id} mosaic artwork must use the narrow layout gap`)
+    if (film.id === 'sky-blue') {
+      assert.ok(mosaicArtwork.some(({ type, radius, cy }) => type === 'circle' && radius >= 32 && cy >= 1137 && cy <= 1415), 'sky-blue mosaic must keep large classic-style bubbles in the caption area')
+    }
+    if (film.id === 'pink-pop') {
+      assert.ok(mosaicArtwork.some(({ type, d }) => type === 'path' && d?.startsWith('M 332 1342')), 'pink-pop mosaic must keep the large classic star in the caption area')
+      assert.ok(mosaicArtwork.some(({ type, d }) => type === 'path' && d?.startsWith('M 665 1405')), 'pink-pop mosaic must keep the large classic heart in the caption area')
     }
   }
-  assert.notEqual(mosaicArtwork, classicArtwork, `${film.id} must provide a distinct mosaic artwork array`)
+  if (!reusesClassicArtwork) assert.notEqual(mosaicArtwork, classicArtwork, `${film.id} must provide a distinct mosaic artwork array`)
+}
+
+for (const filmId of ['letterpress-ochre', 'comet-orange', 'threefold-light']) {
+  const mosaicOverlay = getFilmRenderModel(filmId, MOSAIC_LAYOUT_ID).overlaySvg
+  assert.match(mosaicOverlay, /<rect x="42" y="35" width="250" height="250" fill="black"\/>/, `${filmId} classic artwork reuse must stay behind the first mosaic color photo`)
 }
 
 const classicSurface = getFilmRenderModel(DEFAULT_FILM_ID).svg
