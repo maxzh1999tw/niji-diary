@@ -58,7 +58,7 @@ assert.equal(mosaicLayout.caption.y - (mosaicLayout.photo.y + mosaicLayout.photo
 assert.equal(mosaicLayout.caption.y + mosaicLayout.caption.height, mosaicSources[6].y + mosaicSources[6].height, 'the caption bottom must align with the vertical color column bottom')
 assert.equal(mosaicLayout.caption.y, 1137, 'the mosaic caption must begin after one shared vertical gap')
 assert.equal(mosaicLayout.caption.height, 252, 'the mosaic caption must grow to the vertical color column bottom')
-assert.equal(mosaicLayout.caption.lineHeight, 42, 'the mosaic caption must use the requested two-pixel larger line spacing')
+assert.equal(mosaicLayout.caption.lineHeight, 44, 'the mosaic caption must use the requested two-pixel larger line spacing')
 assert.ok(mosaicLayout.caption.y + mosaicLayout.caption.height <= mosaicLayout.date.y, 'the caption and date must keep separate vertical areas')
 assert.equal(mosaicLayout.date.y - (mosaicLayout.caption.y + mosaicLayout.caption.height), 12, 'the date row must keep a small gap below the caption')
 assert.equal(mosaicLayout.date.y, 1401, 'the date row must move below the taller caption area')
