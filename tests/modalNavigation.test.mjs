@@ -31,6 +31,7 @@ assert.equal(clearModalHistoryState(baseState), baseState)
 
 const appSource = readFileSync(fileURLToPath(new URL('../src/App.jsx', import.meta.url)), 'utf8')
 for (const modalId of [
+  'capture-stage',
   'photo-sampler',
   'solid-background-picker',
   'polaroid-eyedropper',

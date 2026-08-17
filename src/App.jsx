@@ -2035,6 +2035,7 @@ export default function App() {
   const t = translations[lang]
   const photos = day?.photos ?? {}
   const count = dailyLocked ? COLOR_KEYS.length : COLOR_KEYS.reduce((total, key) => total + (photos[key] ? 1 : 0), 0)
+  useModalHistory(Boolean(staged), 'capture-stage', () => cancelCapture())
   const closeSampler = useModalHistory(Boolean(samplerOpen), 'photo-sampler', () => setSamplerOpen(false))
   const closeSelectedDay = useModalHistory(Boolean(selectedDay), 'rainbow-lightbox', () => setSelectedDay(null))
   const closePendingDelete = useModalHistory(Boolean(pendingDelete), 'delete-confirmation', () => setPendingDelete(null))
@@ -2122,6 +2123,12 @@ export default function App() {
     setSelectedDay(null)
     setPendingDelete(null)
     setDevelopedDay(null)
+  }
+
+  function cancelCapture() {
+    clearCurrentModalHistory()
+    setStaged(null)
+    setSamplerOpen(false)
   }
 
   useEffect(() => {
@@ -2272,6 +2279,7 @@ export default function App() {
     if (!staged || dailyLocked) return
     const nextDay = { ...day, schemaVersion: 3, photos: { ...photos, [selectedColor]: staged.image }, samples: { ...(day.samples ?? {}), [selectedColor]: staged.sampleColor } }
     setDay(nextDay)
+    clearCurrentModalHistory()
     setStaged(null)
     setSamplerOpen(false)
     navigator.vibrate?.([25, 35, 25])
@@ -2525,7 +2533,7 @@ export default function App() {
       : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} migrationEnabled={location.origin === LEGACY_ORIGIN} migrationState={migrationState} onMigrate={handleLegacyMigration} onOpenInfo={navigateInfo} />
       : staged
-        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={() => { setStaged(null); setSamplerOpen(false) }} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
+        ? <CaptureStage staged={staged} selectedColor={selectedColor} photos={photos} t={t} onSelect={setSelectedColor} onCancel={cancelCapture} onConfirm={confirmColor} onOpenSampler={() => setSamplerOpen(true)} />
         : composing
           ? <ComposeScreen background={background} solidBackgroundColor={solidBackgroundColor} photos={day?.photos ?? {}} samples={day?.samples ?? {}} caption={day?.caption ?? t.defaultCaption} date={date} transform={rainbowTransform} setTransform={setRainbowTransform} selectedFilmId={filmCollection.selectedFilmId} selectedLayoutId={filmCollection.selectedLayoutId} unlockedFilmIds={filmCollection.unlockedFilmIds} lang={lang} t={t} onCaptionChange={updateDraftCaption} onCaptionCommit={persistDraftCaption} onSelectFilm={selectFilm} onSelectLayout={selectLayout} onCapture={handleBackground} onSelectSolidBackground={handleSolidBackground} onPickPolaroidColor={handlePickPolaroidColor} onBack={exitCompose} onFinish={finishRainbowCard} finishing={finishing} />
           : <TodayScreen day={day} count={count} date={date} lang={lang} t={t} loading={loading} dailyLocked={dailyLocked} onCapture={handleCapture} onRemove={removeColor} onStartCompose={startCompose} />
