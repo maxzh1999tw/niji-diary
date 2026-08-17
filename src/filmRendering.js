@@ -60,7 +60,7 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
   ]),
   sourceFrame: POLAROID_SOURCE_FRAME,
-  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 54, lineHeight: 56, maxLines: 4, verticalAlign: 'top' }),
+  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 54, lineHeight: 60, maxLines: 4, verticalAlign: 'top' }),
   date: Object.freeze({ x: POLAROID_DATE_X, y: MOSAIC_DATE_Y, width: POLAROID_DATE_WIDTH, height: MOSAIC_DATE_HEIGHT, fontSize: 48, lineHeight: 48, baselineY: MOSAIC_DATE_BASELINE }),
   footer: Object.freeze({ x: 50, textY: MOSAIC_DATE_BASELINE, dateWidth: POLAROID_DATE_WIDTH }),
 })
