@@ -797,7 +797,7 @@ function usePolaroidTypography(geometry) {
   return { captionRef, dateRef }
 }
 
-function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, samples, labels, date, dateLabel, lang, filmId, layoutId = DEFAULT_LAYOUT_ID, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
+function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photoInteraction = {}, photos, samples, labels, date, dateLabel, lang, filmId, layoutId = DEFAULT_LAYOUT_ID, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
   const resolvedLayoutId = getFilmLayoutId(film, layoutId)
   const geometry = getPolaroidLayoutGeometry(resolvedLayoutId)
@@ -808,7 +808,7 @@ function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, 
     '--film-ink': film.ink?.primary ?? DEFAULT_FILM_INK,
     '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
   }
-  const mainPhoto = <div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div>
+  const mainPhoto = <div className={`polaroid-photo ${photoClassName}`} {...photoInteraction}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div>
   return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div ref={captionRef} className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}><span ref={dateRef} className="polaroid-date-text">{dateLabel ?? formatDate(date, lang, true)}</span></time></div>{interactionOverlay}</div>
 }
 
@@ -847,7 +847,7 @@ function EditablePolaroidCaption({ value, t, multiline = false, onChange, onComm
     : <input {...commonProps} type="text" onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
 }
 
-function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMove, onPointerUp, onWheel }) {
+function RainbowArtwork({ samples, transform, label }) {
   const transparency = transform.transparency ?? (transform.opacity == null ? 0 : 1 - transform.opacity)
   const style = { left: `${transform.x}%`, top: `${transform.y}%`, opacity: 1 - transparency, transform: `translate(-50%, -50%) rotate(${transform.rotation}deg) scale(${transform.scale})` }
   const outerRadius = 132 * (transform.radius ?? 1)
@@ -866,7 +866,7 @@ function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMov
   const innerRatio = innerRadius / outerRadius
   const outerEdgeStart = innerRatio + (1 - innerRatio) * 0.985
   const spectrumStops = [...COLOR_KEYS].reverse().map((key, index) => <stop key={key} offset={innerRatio + (1 - innerRatio) * (index + 0.5) / COLOR_KEYS.length} stopColor={samples[key] || FALLBACK_COLORS[key]} />)
-  return <div className="rainbow-artwork" style={style} role="img" aria-label={label} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onLostPointerCapture={onPointerUp} onWheel={onWheel}>
+  return <div className="rainbow-artwork" style={style} role="img" aria-label={label}>
     <svg viewBox="0 0 300 316" aria-hidden="true">
       <defs>
         <radialGradient id="rainbow-spectrum" gradientUnits="userSpaceOnUse" cx="150" cy="158" r={outerRadius}>
@@ -1157,9 +1157,13 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
   function beginGesture(event) {
     const frame = event.currentTarget.closest('.composition-canvas-photo')?.getBoundingClientRect()
     if (!frame) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    // Track every pointer in the photo so a second finger can start a pinch
+    // anywhere; only a pointer that began on the rainbow may pan alone.
+    const canPan = typeof event.target?.closest === 'function' && Boolean(event.target.closest('.rainbow-artwork'))
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY, canPan })
     rebaseGesture(frame)
   }
 
@@ -1168,17 +1172,20 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     if (entries.length >= 2) {
       const active = entries.slice(0, 2)
       gesture.current = { mode: 'pinch', frame, pointerIds: active.map(([id]) => id), points: active.map(([, point]) => ({ ...point })) }
-    } else if (entries.length === 1) {
+    } else if (entries.length === 1 && entries[0][1].canPan) {
       const [pointerId, point] = entries[0]
       gesture.current = { mode: 'pan', frame, pointerId, point: { ...point } }
     } else gesture.current = null
   }
 
   function moveGesture(event) {
-    if (!pointers.current.has(event.pointerId) || !gesture.current) return
-    event.preventDefault()
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    const pointer = pointers.current.get(event.pointerId)
+    if (!pointer) return
+    pointer.x = event.clientX
+    pointer.y = event.clientY
     const start = gesture.current
+    if (!start) return
+    event.preventDefault()
 
     if (start.mode === 'pinch') {
       const points = start.pointerIds.map((id) => pointers.current.get(id))
@@ -1230,6 +1237,14 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     { key: 'film', icon: 'film', label: t.filmPickerLabel },
   ]
   const activeControl = editorTools.find((tool) => tool.key === activeTool && tool.min !== undefined) ?? editorTools[0]
+  const photoInteraction = {
+    onPointerDown: beginGesture,
+    onPointerMove: moveGesture,
+    onPointerUp: endGesture,
+    onPointerCancel: endGesture,
+    onLostPointerCapture: endGesture,
+    onWheel: zoomWithWheel,
+  }
   function handleCaptionChange(nextCaption) {
     latestCaption.current = nextCaption
     onCaptionChange(nextCaption)
@@ -1272,7 +1287,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={eyedropperActive ? () => setEyedropperActive(false) : onBack} aria-label={eyedropperActive ? t.cancelPickColor : t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title" aria-live="polite">{eyedropperActive ? t.pickColorTitle : background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? eyedropperActive ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={eyedropperBusy} onClick={() => setEyedropperActive(false)}><Icon name="back" size={18} />{t.cancelPickColor}</button></div> : <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="cameraRainbow" size={52} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label><button className="background-source solid-source" type="button" onClick={() => setSolidPickerOpen(true)}><Icon name="palette" /><span><b>{t.chooseSolidBackground}</b><small>{t.solidBackgroundHint}</small></span></button></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" aria-label={t.retakeBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" aria-label={t.uploadBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} />} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId} layoutId={selectedLayoutId}><EditablePolaroidCaption value={caption} t={t} multiline={selectedLayoutId === MOSAIC_LAYOUT_ID} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
+      <div className="canvas-stage"><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" aria-label={t.retakeBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" aria-label={t.uploadBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" photoInteraction={photoInteraction} media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} />} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId} layoutId={selectedLayoutId}><EditablePolaroidCaption value={caption} t={t} multiline={selectedLayoutId === MOSAIC_LAYOUT_ID} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} selectedLayoutId={selectedLayoutId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} onSelectLayout={onSelectLayout} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => updateEditorValue(activeControl.key, Number(event.target.value))} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => {
