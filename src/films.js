@@ -37,9 +37,17 @@ export const FILMS = [
     unlock: { type: 'always', target: 0 },
     paper: { top: '#ffffff', middle: '#fdfcf9', bottom: '#f5f3ee', accent: '#d7d0dc' },
     artwork: [],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'circle', layer: 'foreground', cx: 884, cy: 84, radius: 22, fill: 'none', stroke: 'accent', strokeWidth: 6, opacity: 0.62 },
+        { type: 'path', layer: 'foreground', d: 'M 916 110 L 954 148', fill: 'none', stroke: 'accent', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.48 },
+        { type: 'circle', layer: 'foreground', cx: 934, cy: 220, radius: 13, opacity: 0.24 },
+      ],
+    },
   },
   {
     id: 'sky-blue',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-sky-blue',
     nameKey: 'filmSkyBlueName',
     conditionKey: 'filmSkyBlueCondition',
@@ -59,9 +67,18 @@ export const FILMS = [
       { type: 'circle', cx: 930, cy: 1298, radius: 27, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.3 },
       { type: 'circle', cx: 910, cy: 1395, radius: 16, opacity: 0.22 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'circle', layer: 'foreground', cx: 886, cy: 88, radius: 22, fill: 'none', stroke: 'accent', strokeWidth: 7, opacity: 0.34 },
+        { type: 'circle', layer: 'foreground', cx: 932, cy: 148, radius: 15, opacity: 0.24 },
+        { type: 'circle', layer: 'foreground', cx: 878, cy: 216, radius: 29, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.3 },
+        { type: 'circle', layer: 'foreground', cx: 923, cy: 274, radius: 10, opacity: 0.22 },
+      ],
+    },
   },
   {
     id: 'pink-pop',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-pink-pop',
     nameKey: 'filmPinkName',
     conditionKey: 'filmPinkCondition',
@@ -89,9 +106,18 @@ export const FILMS = [
       { type: 'path', d: 'M 332 1342 L 346 1364 L 371 1367 L 353 1385 L 358 1410 L 334 1399 L 312 1412 L 315 1386 L 296 1369 L 321 1365 Z', fill: 'none', stroke: 'accent', strokeWidth: 8, strokeLinejoin: 'round', opacity: 0.36 },
       { type: 'path', d: 'M 665 1405 C 628 1373 647 1334 681 1353 C 715 1319 755 1351 737 1388 C 724 1411 693 1426 665 1405 Z', fill: 'none', stroke: 'accent', strokeWidth: 9, strokeLinejoin: 'round', opacity: 0.38 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'rect', layer: 'foreground', cx: 875, cy: 88, width: 18, height: 58, rotation: -24, opacity: 0.6 },
+        { type: 'path', layer: 'foreground', d: 'M 918 142 L 939 119 L 960 142 L 939 165 Z', fill: 'none', stroke: 'accent', strokeWidth: 8, strokeLinejoin: 'round', opacity: 0.62 },
+        { type: 'circle', layer: 'foreground', cx: 878, cy: 224, radius: 18, fill: 'none', stroke: 'accent', strokeWidth: 8, opacity: 0.65 },
+        { type: 'rect', layer: 'foreground', cx: 932, cy: 256, width: 16, height: 42, rotation: 34, opacity: 0.58 },
+      ],
+    },
   },
   {
     id: 'mint-green',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-mint-green',
     nameKey: 'filmMintGreenName',
     conditionKey: 'filmMintGreenCondition',
@@ -117,9 +143,18 @@ export const FILMS = [
       { type: 'ellipse', cx: 530, cy: 1363, radiusX: 15, radiusY: 34, rotation: 55, opacity: 0.38 },
       { type: 'ellipse', cx: 728, cy: 1378, radiusX: 15, radiusY: 34, rotation: -55, opacity: 0.38 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 870 42 C 948 82 862 132 934 174 C 966 194 914 240 886 286', fill: 'none', stroke: 'accent', strokeWidth: 9, strokeLinecap: 'round', opacity: 0.5 },
+        { type: 'ellipse', layer: 'foreground', cx: 894, cy: 90, radiusX: 19, radiusY: 33, rotation: -38, opacity: 0.58 },
+        { type: 'ellipse', layer: 'foreground', cx: 924, cy: 205, radiusX: 18, radiusY: 31, rotation: 38, opacity: 0.54 },
+        { type: 'ellipse', layer: 'foreground', cx: 884, cy: 270, radiusX: 13, radiusY: 23, rotation: -32, opacity: 0.46 },
+      ],
+    },
   },
   {
     id: 'letterpress-ochre',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-letterpress-ochre',
     nameKey: 'filmLetterpressName',
     conditionKey: 'filmLetterpressCondition',
@@ -139,9 +174,17 @@ export const FILMS = [
       { type: 'path', d: 'M 176 1208 H 374 L 404 1198 H 456 L 476 1208 H 524 L 544 1198 H 596 L 626 1208 H 824', fill: 'none', stroke: 'accent', strokeWidth: 6, strokeLinejoin: 'round', opacity: 0.38 },
       { type: 'path', d: 'M 226 1217 H 392 L 420 1207 H 580 L 608 1217 H 774', fill: 'none', stroke: '#a94f3d', strokeWidth: 4, strokeLinejoin: 'round', opacity: 0.44 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 854 52 H 898 V 94 H 938 V 136 H 900 V 178 H 946 V 220 H 912 V 262 H 854', fill: 'none', stroke: '#80603d', strokeWidth: 20, strokeLinejoin: 'round', opacity: 0.16 },
+        { type: 'path', layer: 'foreground', d: 'M 854 52 H 898 V 94 H 938 V 136 H 900 V 178 H 946 V 220 H 912 V 262 H 854', fill: 'none', stroke: 'accent', strokeWidth: 10, strokeLinejoin: 'round', opacity: 0.78 },
+        { type: 'path', layer: 'foreground', d: 'M 858 62 H 890 V 104 H 928 V 126 H 890 V 188 H 936 V 210 H 902 V 252 H 858', fill: 'none', stroke: '#a94f3d', strokeWidth: 5, strokeLinejoin: 'round', opacity: 0.68 },
+      ],
+    },
   },
   {
     id: 'vellum-mist',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-vellum-mist',
     nameKey: 'filmVellumName',
     conditionKey: 'filmVellumCondition',
@@ -159,9 +202,17 @@ export const FILMS = [
       { type: 'path', d: 'M -20 1452 L 188 1468 L 116 1518 L -20 1518 Z', fill: '#b7a8d8', opacity: 0.34 },
       { type: 'path', d: 'M 1020 1440 L 824 1474 L 902 1524 L 1020 1524 Z', fill: '#9dcbc3', opacity: 0.32 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 850 46 L 960 70 L 940 156 L 864 134 Z', fill: '#b7a8d8', opacity: 0.34 },
+        { type: 'path', layer: 'foreground', d: 'M 882 140 L 952 170 L 926 282 L 858 240 Z', fill: '#9dcbc3', opacity: 0.28 },
+        { type: 'path', layer: 'foreground', d: 'M 862 58 L 932 46 L 910 286', fill: 'none', stroke: 'accent', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.42 },
+      ],
+    },
   },
   {
     id: 'comet-orange',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-comet-orange',
     nameKey: 'filmCometName',
     conditionKey: 'filmCometCondition',
@@ -180,9 +231,18 @@ export const FILMS = [
       { type: 'rect', layer: 'foreground', cx: 974, cy: 930, width: 42, height: 8, rotation: 18, opacity: 0.52 },
       { type: 'rect', layer: 'foreground', cx: 972, cy: 980, width: 28, height: 8, rotation: 18, opacity: 0.42 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 850 42 C 924 78 958 158 902 286', fill: 'none', stroke: 'accent', strokeWidth: 24, strokeLinecap: 'round', opacity: 0.24 },
+        { type: 'path', layer: 'foreground', d: 'M 858 48 C 922 86 946 156 906 274', fill: 'none', stroke: '#fff0cd', strokeWidth: 7, strokeLinecap: 'round', opacity: 0.72 },
+        { type: 'rect', layer: 'foreground', cx: 890, cy: 78, width: 34, height: 7, rotation: 20, opacity: 0.52 },
+        { type: 'rect', layer: 'foreground', cx: 930, cy: 116, width: 24, height: 7, rotation: 20, opacity: 0.42 },
+      ],
+    },
   },
   {
     id: 'eclipse-silver',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-eclipse-silver',
     nameKey: 'filmEclipseName',
     conditionKey: 'filmEclipseCondition',
@@ -205,9 +265,18 @@ export const FILMS = [
       { type: 'rect', cx: 712, cy: 1473, width: 26, height: 8, rotation: 0, opacity: 0.24 },
       { type: 'rect', cx: 880, cy: 1473, width: 44, height: 8, rotation: 0, opacity: 0.34 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 842 292 C 860 180 900 86 966 48', fill: 'none', stroke: 'accent', strokeWidth: 12, strokeLinecap: 'round', opacity: 0.76 },
+        { type: 'path', layer: 'foreground', d: 'M 856 280 C 876 180 916 105 958 78', fill: 'none', stroke: '#7483a5', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.7 },
+        { type: 'rect', layer: 'foreground', cx: 870, cy: 74, width: 30, height: 7, rotation: 0, opacity: 0.52 },
+        { type: 'rect', layer: 'foreground', cx: 896, cy: 244, width: 18, height: 7, rotation: 0, opacity: 0.42 },
+      ],
+    },
   },
   {
     id: 'threefold-light',
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-threefold-light',
     nameKey: 'filmThreefoldName',
     conditionKey: 'filmThreefoldCondition',
@@ -226,6 +295,14 @@ export const FILMS = [
       { type: 'path', d: 'M -16 1450 C 72 1378 148 1390 210 1508 H -16 Z', fill: '#59517d', opacity: 0.3 },
       { type: 'path', d: 'M 1016 1450 C 928 1378 852 1390 790 1508 H 1016 Z', fill: '#3d8f87', opacity: 0.28 },
     ],
+    artworkByLayout: {
+      [MOSAIC_LAYOUT_ID]: [
+        { type: 'path', layer: 'foreground', d: 'M 846 36 H 960 V 108 C 922 96 884 102 846 132 Z', fill: '#e6b84a', opacity: 0.78 },
+        { type: 'path', layer: 'foreground', d: 'M 846 132 C 886 108 930 130 960 156 V 218 C 916 198 878 204 846 238 Z', fill: '#e98c78', opacity: 0.72 },
+        { type: 'path', layer: 'foreground', d: 'M 846 238 C 882 212 924 224 960 246 V 302 H 846 Z', fill: '#3d8f87', opacity: 0.7 },
+        { type: 'path', layer: 'foreground', d: 'M 852 278 C 888 252 924 264 956 284', fill: 'none', stroke: 'accent', strokeWidth: 5, strokeLinecap: 'round', opacity: 0.42 },
+      ],
+    },
   },
 ]
 
@@ -237,6 +314,13 @@ function normalizeFilmId(id) {
 
 export function getFilm(id) {
   return FILM_BY_ID.get(normalizeFilmId(id)) ?? FILM_BY_ID.get(DEFAULT_FILM_ID)
+}
+
+export function getFilmArtwork(filmOrId, layoutId = DEFAULT_LAYOUT_ID) {
+  const film = typeof filmOrId === 'object' && filmOrId ? filmOrId : getFilm(filmOrId)
+  const resolvedLayoutId = getFilmLayoutId(film, layoutId)
+  const layoutArtwork = film.artworkByLayout?.[resolvedLayoutId]
+  return Array.isArray(layoutArtwork) ? layoutArtwork : (Array.isArray(film.artwork) ? film.artwork : [])
 }
 
 export function getSupportedFilmLayoutIds(filmOrId) {

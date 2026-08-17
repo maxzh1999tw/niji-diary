@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { DEFAULT_FILM_ID, FILMS, MOSAIC_LAYOUT_ID } from '../src/films.js'
+import { DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, FILMS, getFilmArtwork, MOSAIC_LAYOUT_ID } from '../src/films.js'
 import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
@@ -121,6 +121,18 @@ for (const film of FILMS) {
       }
     }
   }
+}
+
+for (const film of FILMS) {
+  const classicArtwork = getFilmArtwork(film, DEFAULT_LAYOUT_ID)
+  const mosaicArtwork = getFilmArtwork(film, MOSAIC_LAYOUT_ID)
+  const mosaicModel = getFilmRenderModel(film.id, MOSAIC_LAYOUT_ID)
+  assert.equal(mosaicModel.layout, MOSAIC_POLAROID_LAYOUT, `${film.id} must resolve the mosaic layout`)
+  assert.equal(mosaicModel.svg, createFilmSurfaceSvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic surface must use its layout artwork`)
+  assert.equal(mosaicModel.overlaySvg, createFilmOverlaySvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic overlay must use its layout artwork`)
+  assert.equal(classicArtwork, film.artwork, `${film.id} classic artwork must keep the original artwork array`)
+  assert.ok(Array.isArray(mosaicArtwork), `${film.id} mosaic artwork must be declared as an array`)
+  assert.notEqual(mosaicArtwork, classicArtwork, `${film.id} must provide a distinct mosaic artwork array`)
 }
 
 const classicSurface = getFilmRenderModel(DEFAULT_FILM_ID).svg

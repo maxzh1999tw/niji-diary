@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT_ID, getFilm, getFilmLayoutId, MOSAIC_LAYOUT_ID } from './films.js'
+import { DEFAULT_LAYOUT_ID, getFilm, getFilmArtwork, getFilmLayoutId, MOSAIC_LAYOUT_ID } from './films.js'
 
 export const POLAROID_SOURCE_FRAME = Object.freeze({ innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 })
 
@@ -219,16 +219,16 @@ function renderArtworkShape(shape, accent) {
   return ''
 }
 
-export function createFilmSurfaceSvg(filmId) {
+export function createFilmSurfaceSvg(filmId, layoutId = DEFAULT_LAYOUT_ID) {
   const film = getFilm(filmId)
   const stops = PAPER_STOPS.map(({ offset, colorKey }) => `<stop offset="${offset * 100}%" stop-color="${escapeAttribute(film.paper[colorKey])}"/>`).join('')
-  const artwork = film.artwork.filter((shape) => shape.layer !== 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
+  const artwork = getFilmArtwork(film, layoutId).filter((shape) => shape.layer !== 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="paper" x1="0" y1="0" x2="${POLAROID_LAYOUT.width}" y2="${POLAROID_LAYOUT.height}" gradientUnits="userSpaceOnUse">${stops}</linearGradient></defs><rect width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}" fill="url(#paper)"/>${artwork}</svg>`
 }
 
 export function createFilmOverlaySvg(filmId, layoutId = DEFAULT_LAYOUT_ID) {
   const film = getFilm(filmId)
-  const artwork = film.artwork.filter((shape) => shape.layer === 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
+  const artwork = getFilmArtwork(film, layoutId).filter((shape) => shape.layer === 'foreground').map((shape) => renderArtworkShape(shape, film.paper.accent)).join('')
   if (!artwork) return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet"></svg>`
   const { x, y, width, height } = getPolaroidLayout(getFilmLayoutId(film, layoutId)).photo
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${POLAROID_LAYOUT.width} ${POLAROID_LAYOUT.height}" preserveAspectRatio="xMidYMid meet"><defs><mask id="frame-only" maskUnits="userSpaceOnUse" x="0" y="0" width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}"><rect width="${POLAROID_LAYOUT.width}" height="${POLAROID_LAYOUT.height}" fill="white"/><rect x="${x}" y="${y}" width="${width}" height="${height}" fill="black"/></mask></defs><g mask="url(#frame-only)">${artwork}</g></svg>`
@@ -250,7 +250,7 @@ export function getFilmRenderModel(filmId, layoutId = DEFAULT_LAYOUT_ID) {
   const cached = renderModelCache.get(cacheKey)
   if (cached) return cached
 
-  const svg = createFilmSurfaceSvg(film.id)
+  const svg = createFilmSurfaceSvg(film.id, layout.id)
   const overlaySvg = createFilmOverlaySvg(film.id, layout.id)
   const geometry = getPolaroidLayoutGeometry(layout)
   const model = Object.freeze({
