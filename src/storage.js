@@ -1,10 +1,11 @@
-import { FILM_COLLECTION_SCHEMA_VERSION, isAllGreenRainbow, normalizeFilmCollection } from './films.js'
+import { DEFAULT_LAYOUT_ID, FILM_COLLECTION_SCHEMA_VERSION, getFilmLayoutId, isAllGreenRainbow, normalizeFilmCollection } from './films.js'
 
 const DB_NAME = 'niji-diary'
 const STORE_NAME = 'days'
 const DB_VERSION = 1
 
-export const COMPLETED_DAY_SCHEMA_VERSION = 5
+export const COMPLETED_DAY_SCHEMA_VERSION = 6
+const CAPTIONLESS_COMPLETED_DAY_SCHEMA_VERSION = 5
 
 export const ACTIVE_DRAFT_KEY = '__active-draft__'
 export const FILM_COLLECTION_KEY = '__film-collection__'
@@ -139,6 +140,7 @@ function mergeFilmCollection(incoming, existing) {
     date: FILM_COLLECTION_KEY,
     unlockedFilmIds,
     selectedFilmId: destinationSelected ?? sourceSelected ?? existing.selectedFilmId ?? incoming.selectedFilmId,
+    selectedLayoutId: existing.selectedLayoutId ?? incoming.selectedLayoutId,
   }
 }
 
@@ -265,10 +267,13 @@ export function createCompletedDayRecord(day, polaroidImage = day?.polaroidImage
   const completedDay = {
     ...day,
     schemaVersion: COMPLETED_DAY_SCHEMA_VERSION,
+    layoutId: getFilmLayoutId(day?.filmId, day?.layoutId ?? DEFAULT_LAYOUT_ID),
     polaroidImage,
     achievements: {
       ...(day?.achievements ?? {}),
-      allGreenRainbow: isAllGreenRainbow(day),
+      allGreenRainbow: typeof day?.achievements?.allGreenRainbow === 'boolean'
+        ? day.achievements.allGreenRainbow
+        : isAllGreenRainbow(day),
     },
   }
 
@@ -290,6 +295,7 @@ export function completedDayNeedsCompaction(day) {
     || 'cardImage' in day
     || 'composition' in day
     || 'filmId' in day
+    || typeof day.layoutId !== 'string'
   )
 }
 
@@ -297,7 +303,15 @@ export async function migrateCompletedDay(day, renderPolaroid, persist = saveDay
   if (!completedDayNeedsCompaction(day)) return day
 
   try {
-    const polaroidImage = day.schemaVersion === COMPLETED_DAY_SCHEMA_VERSION && day.polaroidImage
+    const isLayoutOnlyUpgrade = day.schemaVersion === CAPTIONLESS_COMPLETED_DAY_SCHEMA_VERSION
+      && typeof day.polaroidImage === 'string'
+      && day.polaroidImage
+      && !('photos' in day)
+      && !('samples' in day)
+      && !('cardImage' in day)
+      && !('composition' in day)
+      && !('filmId' in day)
+    const polaroidImage = isLayoutOnlyUpgrade || (day.schemaVersion === COMPLETED_DAY_SCHEMA_VERSION && day.polaroidImage)
       ? day.polaroidImage
       : await renderPolaroid(day)
     const compactedDay = createCompletedDayRecord(day, polaroidImage)
@@ -331,6 +345,7 @@ export function saveFilmCollection(collection) {
     date: FILM_COLLECTION_KEY,
     unlockedFilmIds: Array.isArray(collection?.unlockedFilmIds) ? [...collection.unlockedFilmIds] : [],
     selectedFilmId: collection?.selectedFilmId,
+    selectedLayoutId: collection?.selectedLayoutId,
   }
   delete record.needsSave
   return transact('readwrite', (store) => {

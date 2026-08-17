@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { DEFAULT_FILM_ID, FILMS } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayoutStyle, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
+import { DEFAULT_FILM_ID, FILMS, MOSAIC_LAYOUT_ID } from '../src/films.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -21,6 +21,20 @@ const layoutStyle = getPolaroidLayoutStyle()
 assert.equal(layoutStyle['--polaroid-photo-x'], '3.5cqw')
 assert.equal(layoutStyle['--polaroid-source-height'], '11.5cqw')
 assert.equal(layoutStyle['--polaroid-footer-x'], '5%')
+
+const mosaicLayout = getPolaroidLayout(MOSAIC_LAYOUT_ID)
+const mosaicSources = getPolaroidSourceRects(mosaicLayout)
+const classicSources = getPolaroidSourceRects(POLAROID_LAYOUT)
+assert.equal(mosaicLayout, MOSAIC_POLAROID_LAYOUT)
+assert.equal(mosaicLayout.photo.width / mosaicLayout.photo.height, 4 / 5, 'the new layout must preserve the main photo ratio')
+assert.equal(mosaicSources.length, 7)
+assert.deepEqual(mosaicSources.slice(0, 3).map(({ y }) => y), [35, 35, 35], 'the first three color photos must form one horizontal row')
+assert.deepEqual(mosaicSources.slice(3, 5).map(({ x }) => x), [42, 42], 'the next two color photos must stack on the left')
+assert.deepEqual(mosaicSources.slice(5).map(({ x }) => x), [704.75, 704.75], 'the last two color photos must stack on the right')
+assert.ok(mosaicSources.every((source, index) => source.width > classicSources[index].width), 'all color photos must be larger than in the classic layout')
+assert.ok(mosaicLayout.photo.width > mosaicSources[3].width && mosaicLayout.photo.height > mosaicSources[3].height, 'the main photo must remain slightly larger than one color photo')
+assert.notEqual(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID), getFilmRenderModel(DEFAULT_FILM_ID), 'render models must be cached per film and layout')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).layout, MOSAIC_POLAROID_LAYOUT)
 
 for (const film of FILMS) {
   const model = getFilmRenderModel(film.id)

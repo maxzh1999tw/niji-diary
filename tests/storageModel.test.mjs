@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { ACTIVE_DRAFT_KEY, COMPLETED_DAY_SCHEMA_VERSION, COMPLETION_GATE_KEY, FILM_COLLECTION_KEY, STORAGE_SNAPSHOT_SCHEMA_VERSION, completedDayNeedsCompaction, createCompletedDayRecord, deriveCollectionState, mergeStorageRecords, migrateCompletedDay, validateStorageSnapshot } from '../src/storage.js'
+import { DEFAULT_LAYOUT_ID } from '../src/films.js'
 
 const legacyRecords = [
   { date: '2026-08-01', photos: { red: 'old-red' }, samples: { red: '#aa0000' }, completedAt: null },
@@ -60,6 +61,7 @@ assert.equal(completedRecord.caption, '完成品')
 assert.equal(completedRecord.date, '2026-08-12')
 assert.equal(completedRecord.completedAt, '2026-08-12T12:00:00.000Z')
 assert.equal(completedRecord.captionInk, '#f8f5ea')
+assert.equal(completedRecord.layoutId, DEFAULT_LAYOUT_ID, 'completed Polaroids must keep an explicit layout for later caption placement')
 assert.deepEqual(completedRecord.achievements.filmChallenges, { version: 1, customCaption: true, expandedRadius: true, daypart: 'night' })
 assert.deepEqual(completedRecord.futureMetadata, { preserved: true })
 assert.equal('photos' in completedRecord, false)
@@ -74,6 +76,7 @@ assert.throws(() => createCompletedDayRecord(completed), /Missing completed Pola
 let persistedMigration = null
 const migratedRecord = await migrateCompletedDay(completed, async () => 'migrated-polaroid', async (record) => { persistedMigration = record })
 assert.equal(migratedRecord.polaroidImage, 'migrated-polaroid')
+assert.equal(migratedRecord.layoutId, DEFAULT_LAYOUT_ID, 'legacy completed Polaroids must migrate to the classic layout without changing their baked image')
 assert.deepEqual(persistedMigration, migratedRecord)
 assert.equal('photos' in migratedRecord, false)
 
@@ -87,6 +90,17 @@ assert.equal(versionFourRenderCalled, true)
 assert.equal(migratedVersionFour.schemaVersion, COMPLETED_DAY_SCHEMA_VERSION)
 assert.equal(migratedVersionFour.polaroidImage, 'captionless-polaroid')
 assert.equal(migratedVersionFour.caption, '完成品')
+
+let versionFiveRenderCalled = false
+const versionFiveRecord = { ...completedRecord, schemaVersion: 5, polaroidImage: 'already-captionless-polaroid' }
+delete versionFiveRecord.layoutId
+const migratedVersionFive = await migrateCompletedDay(versionFiveRecord, async () => {
+  versionFiveRenderCalled = true
+  return 'must-not-repaint-polaroid'
+}, async () => {})
+assert.equal(versionFiveRenderCalled, false, 'schema 5 baked images must not be repainted just to add layout metadata')
+assert.equal(migratedVersionFive.polaroidImage, 'already-captionless-polaroid')
+assert.equal(migratedVersionFive.layoutId, DEFAULT_LAYOUT_ID)
 
 const partialLegacyRecord = { date: '2026-08-13', completedAt: '2026-08-13T12:00:00.000Z', photos: { red: 'only-photo' } }
 const failedRenderRecord = await migrateCompletedDay(partialLegacyRecord, async () => { throw new Error('decode failed') }, async () => assert.fail('failed render must not overwrite storage'))

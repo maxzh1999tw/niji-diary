@@ -1,7 +1,9 @@
 import { COLOR_KEYS, rgbToOklch } from './colorAnalysis.js'
 
 export const DEFAULT_FILM_ID = 'classic-white'
-export const FILM_COLLECTION_SCHEMA_VERSION = 1
+export const DEFAULT_LAYOUT_ID = 'classic'
+export const MOSAIC_LAYOUT_ID = 'mosaic-seven'
+export const FILM_COLLECTION_SCHEMA_VERSION = 2
 export const FILM_CHALLENGE_VERSION = 1
 export const FILM_DAYPART_KEYS = Object.freeze(['morning', 'midday', 'night'])
 
@@ -28,6 +30,7 @@ const FILM_DAYPART_ALIASES = Object.freeze({
 export const FILMS = [
   {
     id: DEFAULT_FILM_ID,
+    supportedLayoutIds: [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID],
     className: 'film-classic-white',
     nameKey: 'filmClassicName',
     conditionKey: 'filmClassicCondition',
@@ -236,6 +239,17 @@ export function getFilm(id) {
   return FILM_BY_ID.get(normalizeFilmId(id)) ?? FILM_BY_ID.get(DEFAULT_FILM_ID)
 }
 
+export function getSupportedFilmLayoutIds(filmOrId) {
+  const film = typeof filmOrId === 'object' && filmOrId ? filmOrId : getFilm(filmOrId)
+  const declaredIds = Array.isArray(film.supportedLayoutIds) ? film.supportedLayoutIds : []
+  return [...new Set([DEFAULT_LAYOUT_ID, ...declaredIds.filter((id) => typeof id === 'string')])]
+}
+
+export function getFilmLayoutId(filmOrId, requestedLayoutId) {
+  const supportedLayoutIds = getSupportedFilmLayoutIds(filmOrId)
+  return supportedLayoutIds.includes(requestedLayoutId) ? requestedLayoutId : DEFAULT_LAYOUT_ID
+}
+
 function completedDates(completedDays = []) {
   return [...new Set(completedDays
     .filter((day) => DATE_PATTERN.test(day?.date ?? '') && day.completedAt)
@@ -427,10 +441,19 @@ export function normalizeFilmCollection(record, completedDays = []) {
   }
   const requestedFilmId = normalizeFilmId(record?.selectedFilmId)
   const selectedFilmId = unlockedFilmIds.includes(requestedFilmId) ? requestedFilmId : DEFAULT_FILM_ID
+  const selectedLayoutId = getFilmLayoutId(selectedFilmId, record?.selectedLayoutId)
   const needsSave = !record
     || record.schemaVersion !== FILM_COLLECTION_SCHEMA_VERSION
     || !sameArray(rawStoredIds, unlockedFilmIds)
     || record.selectedFilmId !== selectedFilmId
+    || record.selectedLayoutId !== selectedLayoutId
 
-  return { schemaVersion: FILM_COLLECTION_SCHEMA_VERSION, unlockedFilmIds, selectedFilmId, needsSave }
+  return {
+    ...(record && typeof record === 'object' ? record : {}),
+    schemaVersion: FILM_COLLECTION_SCHEMA_VERSION,
+    unlockedFilmIds,
+    selectedFilmId,
+    selectedLayoutId,
+    needsSave,
+  }
 }

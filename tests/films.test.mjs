@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { COLOR_KEYS } from '../src/colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, ensureCustomCaptionChallenge, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, isAllGreenRainbow, normalizeFilmCollection } from '../src/films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, getSupportedFilmLayoutIds, isAllGreenRainbow, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from '../src/films.js'
 import { translations } from '../src/i18n.js'
 
 const completed = (date, overrides = {}) => ({ date, completedAt: `${date}T12:00:00.000Z`, photos: {}, samples: {}, ...overrides })
@@ -16,9 +16,14 @@ const challengeRecord = (date, challenges) => completed(date, {
 
 assert.equal(getFilm(undefined).id, DEFAULT_FILM_ID)
 assert.deepEqual(normalizeFilmCollection(null, []).unlockedFilmIds, [DEFAULT_FILM_ID])
+assert.equal(normalizeFilmCollection(null, []).selectedLayoutId, DEFAULT_LAYOUT_ID)
+assert.deepEqual(getSupportedFilmLayoutIds(DEFAULT_FILM_ID), [DEFAULT_LAYOUT_ID, MOSAIC_LAYOUT_ID])
+for (const film of FILMS.slice(1)) assert.deepEqual(getSupportedFilmLayoutIds(film), [DEFAULT_LAYOUT_ID], `${film.id} must default to the classic layout`)
+assert.equal(getFilmLayoutId(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID), MOSAIC_LAYOUT_ID)
+assert.equal(getFilmLayoutId('sky-blue', MOSAIC_LAYOUT_ID), DEFAULT_LAYOUT_ID)
 assert.equal(FILMS.length, 9)
 for (const language of Object.values(translations)) {
-  for (const key of ['filmChallengeGuideTitle', 'filmChallengeGuideHint', 'filmChallengeMet', 'filmChallengePending', 'filmDaypartProgressLabel', 'filmDaypartMorning', 'filmDaypartMidday', 'filmDaypartNight', 'filmDaypartDone', 'filmDaypartPending']) assert.equal(typeof language[key], 'string')
+  for (const key of ['filmChallengeGuideTitle', 'filmChallengeGuideHint', 'filmChallengeMet', 'filmChallengePending', 'filmDaypartProgressLabel', 'filmDaypartMorning', 'filmDaypartMidday', 'filmDaypartNight', 'filmDaypartDone', 'filmDaypartPending', 'layoutPickerLabel', 'layoutSupportedLabel', 'layoutClassicName', 'layoutMosaicName', 'useLayout']) assert.equal(typeof language[key], 'string')
   for (const film of FILMS) {
     assert.equal(typeof language[film.nameKey], 'string', `${film.id} must have a localized name`)
     assert.equal(typeof language[film.conditionKey], 'string', `${film.id} must have a localized condition`)
@@ -140,6 +145,12 @@ assert.deepEqual(unlocked.unlockedFilmIds, [DEFAULT_FILM_ID, 'sky-blue', 'pink-p
 assert.equal(unlocked.selectedFilmId, DEFAULT_FILM_ID)
 const preservedSelection = normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID, 'mint-green'], selectedFilmId: 'mint-green' }, [])
 assert.equal(preservedSelection.selectedFilmId, 'mint-green', 'an existing unlocked selection must survive the expanded film catalog')
+assert.equal(preservedSelection.selectedLayoutId, DEFAULT_LAYOUT_ID, 'pre-layout film collections must receive the compatible default')
+const preservedMosaic = normalizeFilmCollection({ schemaVersion: 2, unlockedFilmIds: [DEFAULT_FILM_ID], selectedFilmId: DEFAULT_FILM_ID, selectedLayoutId: MOSAIC_LAYOUT_ID, futureSetting: 'keep-me' }, [])
+assert.equal(preservedMosaic.selectedLayoutId, MOSAIC_LAYOUT_ID)
+assert.equal(preservedMosaic.futureSetting, 'keep-me', 'unknown future collection fields must survive normalization')
+const unsupportedMosaic = normalizeFilmCollection({ schemaVersion: 2, unlockedFilmIds: [DEFAULT_FILM_ID, 'mint-green'], selectedFilmId: 'mint-green', selectedLayoutId: MOSAIC_LAYOUT_ID }, [])
+assert.equal(unsupportedMosaic.selectedLayoutId, DEFAULT_LAYOUT_ID, 'switching to a film without the selected layout must fall back safely')
 const preservedChangedChallenge = normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID, 'eclipse-silver', 'fourfold-light'], selectedFilmId: 'fourfold-light' }, [])
 assert.deepEqual(preservedChangedChallenge.unlockedFilmIds, [DEFAULT_FILM_ID, 'eclipse-silver', 'threefold-light'], 'changing the unreleased internal id must never revoke a locally unlocked film')
 assert.equal(preservedChangedChallenge.selectedFilmId, 'threefold-light')
