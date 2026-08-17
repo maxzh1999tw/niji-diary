@@ -2,6 +2,13 @@ import { DEFAULT_LAYOUT_ID, getFilm, getFilmArtwork, getFilmLayoutId, MOSAIC_LAY
 
 export const POLAROID_SOURCE_FRAME = Object.freeze({ innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 })
 
+// Keep the date's right edge aligned with the paper's inner margin while giving
+// the full date enough room to render at the canonical 48px size.  Both
+// layouts use this shared geometry so the DOM preview and exported canvas do
+// not disagree about where the date can begin.
+const POLAROID_DATE_X = 670
+const POLAROID_DATE_WIDTH = 280
+
 export const POLAROID_LAYOUT = Object.freeze({
   id: DEFAULT_LAYOUT_ID,
   width: 1000,
@@ -9,9 +16,9 @@ export const POLAROID_LAYOUT = Object.freeze({
   mediaHeight: 1336.5,
   photo: Object.freeze({ x: 35, y: 35, width: 930, height: 1162.5 }),
   sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, ...POLAROID_SOURCE_FRAME }),
-  caption: Object.freeze({ x: 50, y: 1366, width: 600, height: 104, fontSize: 45, lineHeight: 52, maxLines: 1, baselineY: 1418, verticalAlign: 'middle' }),
-  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 48, lineHeight: 48, baselineY: 1418 }),
-  footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
+  caption: Object.freeze({ x: 50, y: 1366, width: 600, height: 104, fontSize: 54, lineHeight: 52, maxLines: 1, baselineY: 1418, verticalAlign: 'middle' }),
+  date: Object.freeze({ x: POLAROID_DATE_X, y: 1375, width: POLAROID_DATE_WIDTH, height: 86, fontSize: 48, lineHeight: 48, baselineY: 1418 }),
+  footer: Object.freeze({ x: 50, textY: 1418, dateWidth: POLAROID_DATE_WIDTH }),
 })
 
 const MOSAIC_CARD_WIDTH = 1000
@@ -53,9 +60,9 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: MOSAIC_SIDE_MARGIN, y: MOSAIC_MAIN_TOP + (MOSAIC_COLOR_SIZE + MOSAIC_VERTICAL_GAP) * 3, width: MOSAIC_COLOR_SIZE, height: MOSAIC_COLOR_SIZE }),
   ]),
   sourceFrame: POLAROID_SOURCE_FRAME,
-  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 50, lineHeight: 52, maxLines: 4, verticalAlign: 'top' }),
-  date: Object.freeze({ x: 730, y: MOSAIC_DATE_Y, width: 220, height: MOSAIC_DATE_HEIGHT, fontSize: 48, lineHeight: 48, baselineY: MOSAIC_DATE_BASELINE }),
-  footer: Object.freeze({ x: 50, textY: MOSAIC_DATE_BASELINE, dateWidth: 220 }),
+  caption: Object.freeze({ x: MOSAIC_MAIN_X, y: MOSAIC_CAPTION_TOP, width: MOSAIC_MAIN_WIDTH, height: MOSAIC_CAPTION_HEIGHT, fontSize: 54, lineHeight: 52, maxLines: 4, verticalAlign: 'top' }),
+  date: Object.freeze({ x: POLAROID_DATE_X, y: MOSAIC_DATE_Y, width: POLAROID_DATE_WIDTH, height: MOSAIC_DATE_HEIGHT, fontSize: 48, lineHeight: 48, baselineY: MOSAIC_DATE_BASELINE }),
+  footer: Object.freeze({ x: 50, textY: MOSAIC_DATE_BASELINE, dateWidth: POLAROID_DATE_WIDTH }),
 })
 
 export const POLAROID_LAYOUTS = Object.freeze({
