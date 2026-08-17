@@ -217,22 +217,52 @@ function fitCanvasText(context, text, maxWidth) {
   return `${fitted}…`
 }
 
+function wrapCanvasText(context, text, maxWidth, maxLines) {
+  const lines = ['']
+  let truncated = false
+  for (const character of Array.from(String(text))) {
+    if (character === '\r') continue
+    if (character === '\n') {
+      if (lines.length >= maxLines) {
+        truncated = true
+        break
+      }
+      lines.push('')
+      continue
+    }
+    const currentLine = lines.at(-1)
+    if (!currentLine || context.measureText(currentLine + character).width <= maxWidth) {
+      lines[lines.length - 1] = currentLine + character
+      continue
+    }
+    if (lines.length >= maxLines) {
+      truncated = true
+      break
+    }
+    lines.push(character)
+  }
+  if (truncated) lines[lines.length - 1] = fitCanvasText(context, `${lines.at(-1)}…`, maxWidth)
+  return lines
+}
+
 function drawPolaroidCaption(context, day, fallbackCaption, layout, ink = DEFAULT_FILM_INK) {
-  const { width, footer } = layout
+  const { caption: captionLayout } = layout
   const caption = day.caption ?? fallbackCaption
   context.textBaseline = 'middle'
   context.fillStyle = day.captionInk ?? ink
-  context.font = '600 45px "Noto Sans TC", "Segoe UI", sans-serif'
-  context.fillText(fitCanvasText(context, caption, width - footer.x * 2 - footer.dateWidth), footer.x, footer.textY)
+  context.font = `600 ${captionLayout.fontSize}px "Noto Sans TC", "Segoe UI", sans-serif`
+  const lines = wrapCanvasText(context, caption, captionLayout.width, captionLayout.maxLines)
+  const firstBaseline = captionLayout.baselineY ?? captionLayout.y + captionLayout.lineHeight / 2
+  lines.forEach((line, index) => context.fillText(line, captionLayout.x, firstBaseline + index * captionLayout.lineHeight))
 }
 
 function drawPolaroidDate(context, day, lang, layout, ink = DEFAULT_FILM_INK_MUTED) {
-  const { width, footer } = layout
+  const { date } = layout
   context.textBaseline = 'middle'
   context.fillStyle = ink
-  context.font = '600 34px "Noto Sans TC", "Segoe UI", sans-serif'
+  context.font = `600 ${date.fontSize}px "Noto Sans TC", "Segoe UI", sans-serif`
   context.textAlign = 'right'
-  context.fillText(formatDate(day.date, lang, true), width - footer.x, footer.textY)
+  context.fillText(formatDate(day.date, lang, true), date.x + date.width, date.baselineY)
   context.textAlign = 'left'
 }
 
@@ -508,8 +538,7 @@ function PolaroidSourcePhoto({ colorKey, geometry, photos, samples, label, image
   </div>
 }
 
-function PolaroidMediaLayout({ layoutId, mainPhoto, photos = {}, samples = {}, labels, imageLoading = 'lazy' }) {
-  const geometry = getPolaroidLayoutGeometry(layoutId)
+function PolaroidMediaLayout({ geometry, mainPhoto, photos = {}, samples = {}, labels, imageLoading = 'lazy' }) {
   return <div className="polaroid-media-layout" style={geometry.mediaStyle}>
     <div className="polaroid-main-slot" style={geometry.photoCardStyle}>
       {mainPhoto}
@@ -736,6 +765,7 @@ function FilmPicker({ selectedFilmId, selectedLayoutId, unlockedFilmIds, lang, t
 function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, samples, labels, date, dateLabel, lang, filmId, layoutId = DEFAULT_LAYOUT_ID, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
   const resolvedLayoutId = getFilmLayoutId(film, layoutId)
+  const geometry = getPolaroidLayoutGeometry(resolvedLayoutId)
   const filmStyle = {
     ...getPolaroidLayoutStyle(resolvedLayoutId),
     '--film-paper-fallback': film.paper.middle,
@@ -743,28 +773,33 @@ function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, 
     '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
   }
   const mainPhoto = <div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div>
-  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout layoutId={resolvedLayoutId} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot">{children}</div><time className="polaroid-date" dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div>{interactionOverlay}</div>
+  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div>{interactionOverlay}</div>
 }
 
 function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
   if (item.polaroidImage) {
     const caption = item.caption ?? t.defaultCaption
-    return <div className={`polaroid-card stored-polaroid ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
+    const geometry = getPolaroidLayoutGeometry(item.layoutId)
+    const multiline = geometry.layout.id === MOSAIC_LAYOUT_ID
+    return <div className={`polaroid-card stored-polaroid layout-${geometry.layout.id} ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
       <img src={item.polaroidImage} alt={alt} loading={imageLoading} />
-      {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} /></div> : null}
-      <div className="stored-polaroid-caption-slot">{editable ? <EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
+      {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} layoutId={geometry.layout.id} /></div> : null}
+      <div className="stored-polaroid-caption-slot" style={geometry.captionCardStyle}>{editable ? <EditablePolaroidCaption value={caption} t={t} multiline={multiline} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
     </div>
   }
   const caption = item.caption ?? t.defaultCaption
-  return <PolaroidCard className={className} image={item.cardImage} alt={alt} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang} filmId={item.filmId} layoutId={item.layoutId}>{editable ? <EditablePolaroidCaption value={caption} t={t} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</PolaroidCard>
+  return <PolaroidCard className={className} image={item.cardImage} alt={alt} media={<EnergyStrip photos={item.photos} samples={item.samples} labels={t.colors} />} photos={item.photos} samples={item.samples} labels={t.colors} date={item.date} lang={lang} filmId={item.filmId} layoutId={item.layoutId}>{editable ? <EditablePolaroidCaption value={caption} t={t} multiline={item.layoutId === MOSAIC_LAYOUT_ID} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</PolaroidCard>
 }
 
 function PolaroidCaption({ children, placeholder = false }) {
   return <span className={`polaroid-caption-text ${placeholder ? 'polaroid-caption-placeholder' : ''}`} aria-hidden={placeholder || undefined}>{children}</span>
 }
 
-function EditablePolaroidCaption({ value, t, onChange, onCommit, onFocus }) {
-  return <input className="polaroid-caption-input" aria-label={t.captionLabel} type="text" maxLength="60" value={value} onFocus={onFocus} onChange={(event) => onChange(event.target.value)} onBlur={(event) => onCommit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
+function EditablePolaroidCaption({ value, t, multiline = false, onChange, onCommit, onFocus }) {
+  const commonProps = { className: 'polaroid-caption-input', 'aria-label': t.captionLabel, maxLength: 60, value, onFocus, onChange: (event) => onChange(event.target.value), onBlur: (event) => onCommit(event.target.value) }
+  return multiline
+    ? <textarea {...commonProps} rows="3" />
+    : <input {...commonProps} type="text" onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
 }
 
 function RainbowArtwork({ samples, transform, label, onPointerDown, onPointerMove, onPointerUp, onWheel }) {
@@ -1192,7 +1227,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
     <header className="studio-topbar"><button className="icon-button" type="button" onClick={eyedropperActive ? () => setEyedropperActive(false) : onBack} aria-label={eyedropperActive ? t.cancelPickColor : t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title" aria-live="polite">{eyedropperActive ? t.pickColorTitle : background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? eyedropperActive ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={eyedropperBusy} onClick={() => setEyedropperActive(false)}><Icon name="back" size={18} />{t.cancelPickColor}</button></div> : <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="cameraRainbow" size={52} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label><button className="background-source solid-source" type="button" onClick={() => setSolidPickerOpen(true)}><Icon name="palette" /><span><b>{t.chooseSolidBackground}</b><small>{t.solidBackgroundHint}</small></span></button></div></div> : <div className="studio-workspace">
-      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div></>} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId} layoutId={selectedLayoutId}><EditablePolaroidCaption value={caption} t={t} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
+      <div className="canvas-stage"><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<><RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} onPointerDown={beginGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onWheel={zoomWithWheel} /><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div></>} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId} layoutId={selectedLayoutId}><EditablePolaroidCaption value={caption} t={t} multiline={selectedLayoutId === MOSAIC_LAYOUT_ID} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
         {activeTool === 'film' ? <FilmPicker selectedFilmId={selectedFilmId} selectedLayoutId={selectedLayoutId} unlockedFilmIds={unlockedFilmIds} lang={lang} t={t} onSelect={onSelectFilm} onSelectLayout={onSelectLayout} /> : activeTool === 'caption' ? null : <label className="active-editor-control"><span>{activeControl.title}<output>{activeControl.output}</output></span><input aria-label={activeControl.title} type="range" min={activeControl.min} max={activeControl.max} step={activeControl.step} value={activeControl.value} onChange={(event) => updateEditorValue(activeControl.key, Number(event.target.value))} /></label>}
         <div className="editor-toolbar" role="toolbar" aria-label={t.editorTools}>{editorTools.map((tool) => {

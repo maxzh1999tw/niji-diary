@@ -42,6 +42,11 @@ assert.equal(getPolaroidLayoutGeometry(MOSAIC_LAYOUT_ID), mosaicGeometry, 'layou
 assert.equal(mosaicGeometry.photo, mosaicLayout.photo)
 assert.deepEqual(mosaicGeometry.photoCardStyle, { left: '27.7cqw', top: '27cqw', width: '68.1cqw', height: '85.125cqw' })
 assert.deepEqual(mosaicGeometry.photoThumbnailStyle, { left: '27.7%', top: '18%', width: '68.1%', height: '56.75%' })
+assert.ok(mosaicLayout.caption.y > mosaicLayout.photo.y + mosaicLayout.photo.height, 'the corner-layout caption must start below the main photo')
+assert.equal(mosaicLayout.caption.maxLines, 3, 'the corner-layout caption must allow multiple lines')
+assert.equal(mosaicGeometry.captionCardStyle.left, '4.2cqw')
+assert.equal(mosaicGeometry.captionCardStyle.top, '113.8cqw')
+assert.deepEqual(mosaicGeometry.captionThumbnailStyle, { left: '4.2%', top: '75.866667%', width: '91.6%', height: '15%' })
 const assertClose = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.000001, message)
 mosaicGeometry.sources.forEach(({ rect, cardStyle, thumbnailStyle }, index) => {
   assertClose(Number.parseFloat(cardStyle.left), rect.x / mosaicLayout.width * 100, `card source ${index + 1} x must derive from the shared rectangle`)

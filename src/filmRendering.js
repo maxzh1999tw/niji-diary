@@ -7,6 +7,8 @@ export const POLAROID_LAYOUT = Object.freeze({
   mediaHeight: 1336.5,
   photo: Object.freeze({ x: 35, y: 35, width: 930, height: 1162.5 }),
   sources: Object.freeze({ x: 42, y: 1221.5, width: 916, height: 115, gap: 11.5, innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 }),
+  caption: Object.freeze({ x: 50, y: 1366, width: 650, height: 104, fontSize: 45, lineHeight: 52, maxLines: 1, baselineY: 1418, verticalAlign: 'middle' }),
+  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })
 
@@ -26,6 +28,8 @@ export const MOSAIC_POLAROID_LAYOUT = Object.freeze({
     Object.freeze({ x: 42, y: 740, width: 211, height: 211 }),
   ]),
   sourceFrame: Object.freeze({ innerX: 7, innerY: 7, innerBottom: 7, accentHeight: 8 }),
+  caption: Object.freeze({ x: 42, y: 1138, width: 916, height: 225, fontSize: 36, lineHeight: 40, maxLines: 3, verticalAlign: 'top' }),
+  date: Object.freeze({ x: 730, y: 1375, width: 220, height: 86, fontSize: 34, baselineY: 1418 }),
   footer: Object.freeze({ x: 50, textY: 1418, dateWidth: 220 }),
 })
 
@@ -118,11 +122,16 @@ export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
       thumbnailStyle: thumbnailRectStyle(rect, layout),
     })
   })
-  const captionRect = Object.freeze({
-    x: layout.footer.x,
-    y: layout.footer.textY - 22,
-    width: layout.width - layout.footer.x * 2 - layout.footer.dateWidth,
-    height: 14,
+  const toCqw = (value) => `${Number((value / layout.width * 100).toFixed(6))}cqw`
+  const captionCardStyle = Object.freeze({
+    ...cardRectStyle(layout.caption, layout.width),
+    alignItems: layout.caption.verticalAlign === 'top' ? 'flex-start' : 'center',
+    '--polaroid-caption-size': toCqw(layout.caption.fontSize),
+    '--polaroid-caption-line-height': String(layout.caption.lineHeight / layout.caption.fontSize),
+  })
+  const dateCardStyle = Object.freeze({
+    ...cardRectStyle(layout.date, layout.width),
+    '--polaroid-date-size': toCqw(layout.date.fontSize),
   })
   const geometry = Object.freeze({
     layout,
@@ -131,8 +140,10 @@ export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
     sources: Object.freeze(sources),
     mediaStyle: Object.freeze({ height: `${Number((layout.mediaHeight / layout.width * 100).toFixed(6))}cqw` }),
     photoCardStyle: cardRectStyle(layout.photo, layout.width),
+    captionCardStyle,
+    dateCardStyle,
     photoThumbnailStyle: thumbnailRectStyle(layout.photo, layout),
-    captionThumbnailStyle: thumbnailRectStyle(captionRect, layout),
+    captionThumbnailStyle: thumbnailRectStyle(layout.caption, layout),
   })
   layoutGeometryCache.set(layout, geometry)
   return geometry
