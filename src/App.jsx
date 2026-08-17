@@ -10,6 +10,7 @@ import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js
 import { INFO_PAGE_META, infoContent } from './infoContent.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { importStorageSnapshot, LEGACY_IMPORT_OFFER, LEGACY_IMPORT_READY, LEGACY_IMPORT_RESPONSE, LEGACY_ORIGIN, NEW_APP_ORIGIN, sendLegacyStorageToNewSite } from './migration.js'
+import { appendModalHistoryToken, clearModalHistoryState, createModalHistoryToken, getModalHistoryStack, removeModalHistoryToken } from './modalNavigation.js'
 import { COMPLETED_DAY_SCHEMA_VERSION, completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
@@ -27,6 +28,67 @@ const QA_MODE = DEV_QUERY?.get('qa') ?? null
 const QA_FILM_ID = DEV_QUERY?.get('film') ?? null
 const FILM_DATABASE_ORDER = new Map(FILMS.map((film, index) => [film.id, index]))
 const QA_SAMPLE = QA_MODE === 'sample' ? { image: './rainbow.svg', suggestedKey: 'green', sampleColor: 'rgb(66, 214, 122)', confidence: 82, samplePoint: { x: 0.5, y: 0.5 } } : null
+
+function closeModalHistoryEntry(entry) {
+  if (!entry || typeof window === 'undefined') return
+  const currentStack = getModalHistoryStack(window.history.state)
+  if (!currentStack.includes(entry.token)) return
+
+  const isCurrentEntry = window.location.href === entry.url
+  const isTopEntry = currentStack.at(-1) === entry.token
+  if (isCurrentEntry && isTopEntry) {
+    window.history.back()
+    return
+  }
+
+  window.history.replaceState(removeModalHistoryToken(window.history.state, entry.token), '', window.location.href)
+}
+
+function clearCurrentModalHistory() {
+  if (typeof window === 'undefined') return
+  const nextState = clearModalHistoryState(window.history.state)
+  if (nextState !== window.history.state) window.history.replaceState(nextState, '', window.location.href)
+}
+
+function useModalHistory(open, id, onBack) {
+  const onBackRef = useRef(onBack)
+  const entryRef = useRef(null)
+  onBackRef.current = onBack
+
+  useEffect(() => {
+    if (!open) {
+      const entry = entryRef.current
+      entryRef.current = null
+      closeModalHistoryEntry(entry)
+      return undefined
+    }
+
+    let entry = entryRef.current
+    if (!entry || entry.id !== id) {
+      const token = createModalHistoryToken(id)
+      const url = window.location.href
+      window.history.pushState(appendModalHistoryToken(window.history.state, token), '', url)
+      entry = { id, token, url }
+      entryRef.current = entry
+    }
+
+    const handlePopState = (event) => {
+      if (getModalHistoryStack(event.state).includes(entry.token)) return
+      if (entryRef.current?.token !== entry.token) return
+      entryRef.current = null
+      onBackRef.current?.()
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [id, open])
+
+  return () => {
+    const entry = entryRef.current
+    entryRef.current = null
+    closeModalHistoryEntry(entry)
+    onBackRef.current?.()
+  }
+}
 
 function Icon({ name, size = 24 }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
@@ -934,6 +996,25 @@ function FullscreenSampler({ staged, t, onClose, onSample }) {
   const [imageAspect, setImageAspect] = useState(1)
   const pointers = useRef(new Map())
   const gesture = useRef(null)
+  const dialogRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    const previousFocus = document.activeElement
+    requestAnimationFrame(() => dialogRef.current?.focus())
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current?.()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      previousFocus?.focus?.()
+    }
+  }, [])
 
   function clampZoom(value) { return Math.max(1, Math.min(4, value)) }
 
@@ -999,7 +1080,7 @@ function FullscreenSampler({ staged, t, onClose, onSample }) {
     zoomBy(event.deltaY < 0 ? 0.2 : -0.2)
   }
 
-  return <section className="sampler-overlay" role="dialog" aria-modal="true" aria-labelledby="sampler-title">
+  return <section ref={dialogRef} className="sampler-overlay" role="dialog" aria-modal="true" aria-labelledby="sampler-title" tabIndex="-1">
     <header className="sampler-header"><button className="icon-button" type="button" onClick={onClose} aria-label={t.cancel}><Icon name="back" /></button><div><span className="chrome-kicker">COLOR PICKER</span><h2 id="sampler-title">{t.samplerTitle}</h2></div><div className="sampler-live" style={{ '--sample': staged.sampleColor }}><i /><span>{t.currentSample}<small>{staged.sampleColor.replace('rgb', '')}</small></span></div></header>
     <div className="sampler-viewport" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheelZoom}>
       <div className="sampler-media" style={{ '--image-aspect': imageAspect, '--inverse-zoom': 1 / view.zoom, transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}>
@@ -1114,6 +1195,8 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
   const gesture = useRef(null)
   const liveTransform = useRef(transform)
   const renderFrame = useRef(null)
+  const closeSolidPicker = useModalHistory(solidPickerOpen, 'solid-background-picker', () => setSolidPickerOpen(false))
+  const closeEyedropper = useModalHistory(eyedropperActive, 'polaroid-eyedropper', () => setEyedropperActive(false))
 
   useEffect(() => {
     if (renderFrame.current === null) liveTransform.current = transform
@@ -1131,11 +1214,11 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     if (!eyedropperActive) return undefined
     requestAnimationFrame(() => eyedropperTargetRef.current?.focus())
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !eyedropperBusy) setEyedropperActive(false)
+      if (event.key === 'Escape' && !eyedropperBusy) closeEyedropper()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [eyedropperActive, eyedropperBusy])
+  }, [closeEyedropper, eyedropperActive, eyedropperBusy])
 
   function queueTransform(next) {
     liveTransform.current = next
@@ -1261,6 +1344,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     setSolidPickerOpen(false)
   }
   function startEyedropper() {
+    clearCurrentModalHistory()
     setSolidPickerOpen(false)
     setEyedropperActive(true)
   }
@@ -1285,7 +1369,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
     }
   }
   return <section className="compose-screen screen-enter" aria-labelledby="compose-title">
-    <header className="studio-topbar"><button className="icon-button" type="button" onClick={eyedropperActive ? () => setEyedropperActive(false) : onBack} aria-label={eyedropperActive ? t.cancelPickColor : t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title" aria-live="polite">{eyedropperActive ? t.pickColorTitle : background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? eyedropperActive ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={eyedropperBusy} onClick={() => setEyedropperActive(false)}><Icon name="back" size={18} />{t.cancelPickColor}</button></div> : <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
+    <header className="studio-topbar"><button className="icon-button" type="button" onClick={eyedropperActive ? closeEyedropper : solidPickerOpen ? closeSolidPicker : onBack} aria-label={eyedropperActive ? t.cancelPickColor : t.cancel}><Icon name="back" /></button><div><span>RAINBOW STUDIO</span><h1 id="compose-title" aria-live="polite">{eyedropperActive ? t.pickColorTitle : background ? t.adjustRainbow : t.composeTitle}</h1></div>{background ? eyedropperActive ? <div className="studio-actions"><button className="studio-reset" type="button" disabled={eyedropperBusy} onClick={closeEyedropper}><Icon name="back" size={18} />{t.cancelPickColor}</button></div> : <div className="studio-actions"><button className="studio-reset" type="button" disabled={finishing} onClick={resetRainbow}><Icon name="reset" size={18} />{t.resetShort}</button><button className="studio-finish" type="button" disabled={finishing} onClick={finishWithLatestCaption}><Icon name="check" size={18} />{finishing ? t.developing : t.done}</button></div> : <i aria-hidden="true" />}</header>
     {!background ? <div className="background-capture-card"><div className="camera-portal"><Icon name="cameraRainbow" size={52} /></div><h2>{t.takeBackground}</h2><p>{t.takeBackgroundHint}</p><div className="background-source-actions"><label className="background-source camera-source"><input type="file" accept="image/*" capture="environment" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" /><span><b>{t.openCamera}</b><small>{t.backgroundOnly}</small></span></label><label className="background-source upload-source"><input type="file" accept="image/*" onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" /><span><b>{t.uploadBackground}</b><small>{t.chooseFromDevice}</small></span></label><button className="background-source solid-source" type="button" onClick={() => setSolidPickerOpen(true)}><Icon name="palette" /><span><b>{t.chooseSolidBackground}</b><small>{t.solidBackgroundHint}</small></span></button></div></div> : <div className="studio-workspace">
       <div className="canvas-stage"><div className="canvas-source-actions"><label className="canvas-source-action" title={t.retakeBackground}><input type="file" accept="image/*" capture="environment" aria-label={t.retakeBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="camera" size={17} /><span>{t.retakeBackground}</span></label><label className="canvas-source-action" title={t.uploadBackground}><input type="file" accept="image/*" aria-label={t.uploadBackground} onChange={(event) => onCapture(event.target.files?.[0], event.target)} /><Icon name="upload" size={17} /><span>{t.uploadBackground}</span></label><button className="canvas-source-action solid-canvas-source" type="button" title={t.chooseSolidBackground} aria-label={t.chooseSolidBackground} onClick={() => setSolidPickerOpen(true)}><Icon name="palette" size={17} /><span>{t.solidBackgroundShort}</span></button></div><PolaroidCard className="composition-canvas" photoClassName="composition-canvas-photo" photoInteraction={photoInteraction} media={<img src={background} alt={solidBackgroundColor ? t.solidBackgroundAlt : t.backgroundAlt} />} overlay={<RainbowArtwork samples={samples} transform={transform} label={t.adjustRainbow} />} interactionOverlay={eyedropperActive ? <button ref={eyedropperTargetRef} className={`polaroid-eyedropper-target ${eyedropperBusy ? 'is-busy' : ''}`} type="button" aria-label={eyedropperBusy ? t.pickColorBusy : t.pickColorTarget} aria-busy={eyedropperBusy} disabled={eyedropperBusy} onClick={pickPolaroidColor} /> : null} photos={photos} samples={samples} labels={t.colors} date={date} lang={lang} filmId={selectedFilmId} layoutId={selectedLayoutId}><EditablePolaroidCaption value={caption} t={t} multiline={selectedLayoutId === MOSAIC_LAYOUT_ID} onChange={handleCaptionChange} onCommit={handleCaptionCommit} /></PolaroidCard></div>
       <div className="editor-dock">
@@ -1295,7 +1379,7 @@ function ComposeScreen({ background, solidBackgroundColor, photos, samples, capt
         })}</div>
       </div>
     </div>}
-    {solidPickerOpen ? <SolidBackgroundPicker selectedColor={solidBackgroundColor} canPickFromPolaroid={Boolean(background)} t={t} onSelect={selectSolidBackground} onStartEyedropper={startEyedropper} onClose={() => setSolidPickerOpen(false)} /> : null}
+    {solidPickerOpen ? <SolidBackgroundPicker selectedColor={solidBackgroundColor} canPickFromPolaroid={Boolean(background)} t={t} onSelect={selectSolidBackground} onStartEyedropper={startEyedropper} onClose={closeSolidPicker} /> : null}
   </section>
 }
 
@@ -1317,6 +1401,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
   const discardTimer = useRef(null)
   const discarding = useRef(false)
   const suppressClickUntil = useRef(0)
+  const closeDeleteMode = useModalHistory(Boolean(deleteMode), 'archive-delete-mode', () => forceDismissDeleteMode())
 
   useEffect(() => {
     if (!deleteMode) return undefined
@@ -1497,6 +1582,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     const preview = previewRef.current
     const trash = trashRef.current
     if (!preview || !trash) {
+      clearCurrentModalHistory()
       setDeleteMode(null)
       onRequestDelete(item)
       return
@@ -1523,6 +1609,7 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     window.clearTimeout(discardTimer.current)
     discardTimer.current = window.setTimeout(() => {
       discarding.current = false
+      clearCurrentModalHistory()
       setDeleteMode(null)
       setOverTrash(false)
       onRequestDelete(item)
@@ -1623,8 +1710,15 @@ function ArchiveScreen({ history, lang, t, onOpen, onRequestDelete }) {
     beginActiveDrag(deleteMode, event.currentTarget, 'pointer', event.pointerId, event.clientX, event.clientY)
   }
 
-  function closeDeleteMode() {
-    if (drag.current?.active || discarding.current) return
+  function forceDismissDeleteMode() {
+    clearLongPress()
+    detachNativeTouchListeners()
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
+    animationFrame.current = null
+    window.clearTimeout(settleTimer.current)
+    window.clearTimeout(discardTimer.current)
+    drag.current = null
+    discarding.current = false
     setDeleteMode(null)
     setOverTrash(false)
   }
@@ -1855,6 +1949,26 @@ async function waitForImageElement(image) {
 function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCaptionChange, onCaptionCommit }) {
   const [printPhase, setPrintPhase] = useState('loading')
   const printedPolaroidRef = useRef(null)
+  const dialogRef = useRef(null)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+
+  useEffect(() => {
+    if (!day) return undefined
+    const previousFocus = document.activeElement
+    requestAnimationFrame(() => dialogRef.current?.focus())
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onDoneRef.current?.()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      previousFocus?.focus?.()
+    }
+  }, [day?.date])
 
   useEffect(() => {
     setPrintPhase('loading')
@@ -1877,7 +1991,7 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
   }
 
   if (!day) return null
-  return <div className="developed-overlay"><section className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title">
+  return <div className="developed-overlay"><section ref={dialogRef} className="developed-result" role="dialog" aria-modal="true" aria-labelledby="developed-title" tabIndex="-1">
     <div className="developed-heading"><span className="chrome-kicker">RAINBOW DEVELOPED</span><h2 id="developed-title">{t.developedTitle}</h2></div>
     <div className={`printer-stage print-${printPhase}`} aria-label={t.developedTitle} aria-busy={printPhase === 'loading'}><PrinterShell /><div ref={printedPolaroidRef} className="printed-polaroid-feed"><div className="printed-polaroid-motion" onAnimationEnd={finishPrintAnimation}><CompletedPolaroid className="printed-polaroid" item={day} imageLoading="eager" alt={t.developedAlt} lang={lang} t={t} editable onCaptionChange={onCaptionChange} onCaptionCommit={onCaptionCommit} /></div></div><PrinterShell foreground /></div>
     <p className="caption-edit-hint"><Icon name="edit" size={17} />{t.editCaptionHint}</p>
@@ -1916,10 +2030,15 @@ export default function App() {
   const messageTimer = useRef(null)
   const hydrationRequestRef = useRef(0)
   const incomingMigrationRequests = useRef(new Set())
+  const lastHashRef = useRef(location.hash)
   const [date, setDate] = useState(localDateKey)
   const t = translations[lang]
   const photos = day?.photos ?? {}
   const count = dailyLocked ? COLOR_KEYS.length : COLOR_KEYS.reduce((total, key) => total + (photos[key] ? 1 : 0), 0)
+  const closeSampler = useModalHistory(Boolean(samplerOpen), 'photo-sampler', () => setSamplerOpen(false))
+  const closeSelectedDay = useModalHistory(Boolean(selectedDay), 'rainbow-lightbox', () => setSelectedDay(null))
+  const closePendingDelete = useModalHistory(Boolean(pendingDelete), 'delete-confirmation', () => setPendingDelete(null))
+  const closeDevelopedDay = useModalHistory(Boolean(developedDay), 'developed-card', () => setDevelopedDay(null))
 
   function showMessage(text) {
     clearTimeout(messageTimer.current)
@@ -1994,6 +2113,16 @@ export default function App() {
     }
   }
 
+  function closeTransientLayers() {
+    clearCurrentModalHistory()
+    setStaged(null)
+    setSamplerOpen(false)
+    setComposing(false)
+    setSelectedDay(null)
+    setPendingDelete(null)
+    setDevelopedDay(null)
+  }
+
   useEffect(() => {
     document.documentElement.lang = lang
     localStorage.setItem('niji-language', lang)
@@ -2017,14 +2146,24 @@ export default function App() {
 
   useEffect(() => {
     const syncHash = () => {
+      if (location.hash === lastHashRef.current) return
+      lastHashRef.current = location.hash
       const route = parseAppHash(location.hash)
+      closeTransientLayers()
       setActiveTab(route.tab)
       setInfoPage(route.infoPage)
       resetAppViewport(true)
     }
     window.addEventListener('hashchange', syncHash)
-    if (!location.hash) window.history.replaceState(null, '', '#today')
-    return () => window.removeEventListener('hashchange', syncHash)
+    window.addEventListener('popstate', syncHash)
+    if (!location.hash) {
+      window.history.replaceState(null, '', '#today')
+      lastHashRef.current = location.hash
+    }
+    return () => {
+      window.removeEventListener('hashchange', syncHash)
+      window.removeEventListener('popstate', syncHash)
+    }
   }, [])
 
   useEffect(() => {
@@ -2075,9 +2214,7 @@ export default function App() {
   }, [date])
 
   function navigate(tab) {
-    setStaged(null)
-    setSamplerOpen(false)
-    setComposing(false)
+    closeTransientLayers()
     setActiveTab(tab)
     setInfoPage(null)
     location.hash = tab
@@ -2086,6 +2223,7 @@ export default function App() {
 
   function navigateInfo(page) {
     if (!INFO_PAGE_KEYS.includes(page)) return
+    closeTransientLayers()
     setActiveTab('settings')
     setInfoPage(page)
     location.hash = infoHash(page)
@@ -2093,6 +2231,7 @@ export default function App() {
   }
 
   function closeInfo() {
+    closeTransientLayers()
     setActiveTab('settings')
     setInfoPage(null)
     location.hash = 'settings'
@@ -2341,6 +2480,7 @@ export default function App() {
   }
 
   function requestDeletePolaroid(target) {
+    clearCurrentModalHistory()
     setSelectedDay(null)
     setPendingDelete(target)
   }
@@ -2402,10 +2542,10 @@ export default function App() {
       {processing ? <div className="processing-overlay" role="status"><div className="scanner"><Icon name="sparkle" size={32} /></div><strong>{t.analyzing}</strong><span>{t.analyzingHint}</span></div> : null}
       <div className={`toast ${message ? 'show' : ''}`} aria-live="polite">{message}</div>
     </div>
-    {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={() => setSamplerOpen(false)} onSample={resamplePhoto} /> : null}
-    <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={() => setSelectedDay(null)} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(selectedDay, caption)} />
-    <DeletePolaroidDialog day={pendingDelete} lang={lang} t={t} deleting={deletingPolaroid} onCancel={() => { if (!deletingPolaroid) setPendingDelete(null) }} onConfirm={confirmDeletePolaroid} />
-    <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={() => setDevelopedDay(null)} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(developedDay, caption)} />
+    {samplerOpen && staged ? <FullscreenSampler staged={staged} t={t} onClose={closeSampler} onSample={resamplePhoto} /> : null}
+    <RainbowModal day={selectedDay} lang={lang} t={t} exporting={exporting} onClose={closeSelectedDay} onSave={() => saveRainbowCard(selectedDay)} onShare={() => shareRainbowCard(selectedDay)} onCaptionChange={(caption) => updateDayCaption(selectedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(selectedDay, caption)} />
+    <DeletePolaroidDialog day={pendingDelete} lang={lang} t={t} deleting={deletingPolaroid} onCancel={closePendingDelete} onConfirm={confirmDeletePolaroid} />
+    <DevelopedCard day={developedDay} lang={lang} t={t} exporting={exporting} onSave={() => saveRainbowCard(developedDay)} onShare={() => shareRainbowCard(developedDay)} onDone={closeDevelopedDay} onCaptionChange={(caption) => updateDayCaption(developedDay.date, caption)} onCaptionCommit={(caption) => persistCaption(developedDay, caption)} />
     {filmNotifications[0] ? <FilmProgressBookmark key={filmNotifications[0].id} notification={filmNotifications[0]} lang={lang} t={t} offsetForNavigation={!immersiveEditor} onDismiss={() => setFilmNotifications((current) => current.slice(1))} /> : null}
   </div>
 }
