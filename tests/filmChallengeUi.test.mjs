@@ -61,6 +61,7 @@ assert.match(appStyles, /\.film-picker-options\.is-scrolling \{\s*scrollbar-colo
 assert.match(appStyles, /\.film-surface-artwork > svg,\s*\.film-surface-overlay > svg \{ width: 100%; height: 100%; display: block; \}/)
 assert.doesNotMatch(appStyles, /layout-thumbnail-(?:classic|mosaic-seven)|mosaic-source-row|mosaic-source-column|mosaic-body/, 'CSS must not maintain a second hard-coded copy of layout geometry')
 assert.match(appStyles, /\.layout-thumbnail \{[^}]*container-type: inline-size;/, 'layout thumbnail frames must provide a sizing container for the shared preview scale')
+assert.match(appStyles, /\.layout-thumbnail \{[^}]*background: transparent;[^}]*box-shadow: none;/, 'layout thumbnail wrappers must not draw a second frame around the preview')
 assert.match(appStyles, /\.layout-thumbnail > \.layout-thumbnail-preview \{[^}]*width: 82px;[^}]*aspect-ratio: 2\/3;[^}]*transform: translate\(-50%, -50%\) scale\(calc\(\(100cqw - 6px\) \/ 82px\)\);[^}]*transform-origin: center;[^}]*box-shadow: none;/, 'layout thumbnails must scale the complete shared preview so artwork strokes and caption geometry shrink together')
 assert.match(appStyles, /\.film-card \.layout-thumbnail > \.layout-thumbnail-preview \{[^}]*width: 82px;[^}]*flex-basis: 82px;/, 'film-card preview sizing must not enlarge nested layout thumbnails')
 assert.doesNotMatch(appSource, /layout-thumbnail-(?:main|sources|caption)/, 'layout thumbnails must not duplicate the full preview with schematic blocks')
