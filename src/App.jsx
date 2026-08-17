@@ -691,8 +691,7 @@ function FilmLayoutChoices({ filmId, selectedLayoutId, lang, t, onSelect, classN
 }
 
 function FilmLayoutSupport({ filmId, lang, t }) {
-  return <div className="film-layout-support" aria-label={t.layoutSupportedLabel}>
-    <span>{t.layoutSupportedLabel}</span>
+  return <div className="film-layout-support" role="group" aria-label={t.layoutSupportedLabel}>
     <div>{getSupportedFilmLayoutIds(filmId).map((layoutId) => {
       const name = t[LAYOUT_NAME_KEYS[layoutId]] ?? layoutId
       return <div className="film-layout-support-item" key={layoutId} title={name}><LayoutThumbnail filmId={filmId} layoutId={layoutId} lang={lang} t={t} /><span className="visually-hidden">{name}</span></div>
@@ -1642,9 +1641,8 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onS
         const progress = getFilmProgress(film, completedDays)
         const collectedDayparts = film.unlock.type === 'distinct-dayparts' ? new Set(getCollectedFilmDayparts(completedDays)) : null
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
-          <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /></div>
+          <div className="film-card-top"><FilmPreviewCard filmId={film.id} lang={lang} t={t} /><FilmLayoutSupport filmId={film.id} lang={lang} t={t} /></div>
           <h2>{t[film.nameKey]}</h2>
-          <FilmLayoutSupport filmId={film.id} lang={lang} t={t} />
           {isUnlocked ? <button className={`film-use-button ${isSelected ? 'is-active' : ''}`} type="button" disabled={isSelected} aria-pressed={isSelected} onClick={() => onSelectFilm(film.id)}>{isSelected ? t.filmSelected : t.useFilm}</button> : <>
             <div className="film-condition"><span>{t.filmConditionLabel}</span><p>{t[film.conditionKey]}</p></div>
             {collectedDayparts ? <div className="film-daypart-list" role="list" aria-label={t.filmDaypartProgressLabel}>{FILM_DAYPART_KEYS.map((daypart) => {

@@ -16,6 +16,8 @@ function contrastRatio(left, right) {
 assert.equal(POLAROID_LAYOUT.width / POLAROID_LAYOUT.height, 2 / 3)
 assert.equal(POLAROID_LAYOUT.photo.width / POLAROID_LAYOUT.photo.height, 4 / 5)
 assert.equal(POLAROID_LAYOUT.sources.y, POLAROID_LAYOUT.photo.y + POLAROID_LAYOUT.photo.height + 24)
+assert.equal(POLAROID_LAYOUT.caption.width, 600, 'the classic caption must reserve one extra character of space before the date')
+assert.ok(POLAROID_LAYOUT.date.x - (POLAROID_LAYOUT.caption.x + POLAROID_LAYOUT.caption.width) >= 70, 'the classic caption and date must keep a safe ellipsis gap')
 
 const layoutStyle = getPolaroidLayoutStyle()
 assert.equal(layoutStyle['--polaroid-photo-x'], '3.5cqw')
