@@ -60,6 +60,7 @@ assert.match(appStyles, /\.film-surface-artwork > svg,\s*\.film-surface-overlay 
 assert.doesNotMatch(appStyles, /layout-thumbnail-(?:classic|mosaic-seven)|mosaic-source-row|mosaic-source-column|mosaic-body/, 'CSS must not maintain a second hard-coded copy of layout geometry')
 assert.match(appStyles, /\.layout-thumbnail > \.layout-thumbnail-preview \{[^}]*width: calc\(100% - 6px\);[^}]*aspect-ratio: 2\/3;[^}]*overflow: hidden;[^}]*box-shadow: none;/, 'layout thumbnail previews must preserve the card ratio and stay inset from the outer frame')
 assert.doesNotMatch(appSource, /layout-thumbnail-(?:main|sources|caption)/, 'layout thumbnails must not duplicate the full preview with schematic blocks')
+assert.match(appStyles, /\.polaroid-caption-placeholder \{[^}]*height: clamp\(1px, 4\.878cqw, 4px\);/, 'preview caption placeholders must scale with the shared card container')
 assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally')
 assert.match(appStyles, /\.film-picker-heading strong,\s*\.film-picker-current,\s*\.film-option-name \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: normal;/)
 
