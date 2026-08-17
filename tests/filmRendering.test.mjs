@@ -138,12 +138,20 @@ for (const film of FILMS) {
   assert.equal(mosaicModel.overlaySvg, createFilmOverlaySvg(film.id, MOSAIC_LAYOUT_ID), `${film.id} mosaic overlay must use its layout artwork`)
   assert.equal(classicArtwork, film.artwork, `${film.id} classic artwork must keep the original artwork array`)
   assert.ok(Array.isArray(mosaicArtwork), `${film.id} mosaic artwork must be declared as an array`)
-  assert.ok(mosaicArtwork.length >= 7, `${film.id} mosaic artwork must distribute several decorative details across the card`)
-  const anchors = mosaicArtwork.map(artworkAnchor).filter(Boolean)
-  assert.ok(anchors.some(({ x }) => x <= 80), `${film.id} mosaic artwork must use the left-side whitespace`)
-  assert.ok(anchors.some(({ x, y }) => x >= 318 && y >= 1137), `${film.id} mosaic artwork must use the caption area`)
-  assert.ok(anchors.some(({ x, y }) => x >= 293 && x <= 317 && y >= 35 && y <= 1111), `${film.id} mosaic artwork must use the narrow layout gap`)
-  assert.ok(anchors.some(({ x, y }) => x >= 840 && y <= 310), `${film.id} mosaic artwork must retain a top-right asymmetric motif`)
+  const classicTypes = new Set(classicArtwork.map(({ type }) => type))
+  assert.ok(mosaicArtwork.every(({ type }) => classicTypes.has(type)), `${film.id} mosaic artwork must reuse the classic visual vocabulary`)
+  if (film.id === DEFAULT_FILM_ID) {
+    assert.equal(mosaicArtwork.length, 0, 'classic white must stay completely undecorated in the mosaic layout')
+  } else {
+    const anchors = mosaicArtwork.map(artworkAnchor).filter(Boolean)
+    assert.ok(anchors.some(({ x, y }) => x >= 840 && y <= 310), `${film.id} mosaic artwork must retain a top-right asymmetric motif`)
+    if (film.id !== 'threefold-light') {
+      assert.ok(mosaicArtwork.length >= 7, `${film.id} mosaic artwork must distribute several decorative details across the card`)
+      assert.ok(anchors.some(({ x }) => x <= 80), `${film.id} mosaic artwork must use the left-side whitespace`)
+      assert.ok(anchors.some(({ x, y }) => x >= 318 && y >= 1137), `${film.id} mosaic artwork must use the caption area`)
+      assert.ok(anchors.some(({ x, y }) => x >= 293 && x <= 317 && y >= 35 && y <= 1111), `${film.id} mosaic artwork must use the narrow layout gap`)
+    }
+  }
   assert.notEqual(mosaicArtwork, classicArtwork, `${film.id} must provide a distinct mosaic artwork array`)
 }
 
@@ -157,6 +165,8 @@ assert.match(scopedOverlay, /url\(#frame-only-previewone\)/)
 assert.equal(classicSurface.includes('<path'), false, 'classic white must remain undecorated')
 assert.equal(classicSurface.includes('<circle'), false, 'classic white must remain undecorated')
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).overlaySvg.includes('<path'), false, 'classic white overlay must remain empty')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).overlaySvg.includes('<circle'), false, 'classic white mosaic overlay must remain empty')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).overlaySvg.includes('<path'), false, 'classic white mosaic overlay must remain empty')
 
 const skyModel = getFilmRenderModel('sky-blue')
 assert.equal((skyModel.svg.match(/<circle /g) ?? []).length, 6)
