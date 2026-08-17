@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, FILMS, getFilmArtwork, MOSAIC_LAYOUT_ID } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, getPolaroidTypographyScale, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -80,7 +80,16 @@ assert.equal(mosaicLayout.caption.maxLines, 4, 'the corner-layout caption must a
 assert.equal(mosaicGeometry.captionCardStyle.left, '31.8cqw')
 assert.equal(mosaicGeometry.captionCardStyle.top, '113.7cqw')
 assert.equal(mosaicGeometry.captionCardStyle.height, '25.2cqw')
-assert.equal(mosaicGeometry.captionCardStyle['--polaroid-caption-line-limit'], '6.3cqw', 'the mosaic caption line budget must derive from its shared four-line box')
+assert.equal(mosaicGeometry.captionCardStyle['--polaroid-caption-font-size'], '36px', 'the mosaic caption font must come from the canonical layout')
+assert.equal(mosaicGeometry.captionCardStyle['--polaroid-caption-line-height-px'], '44px', 'the mosaic caption line height must come from the canonical layout')
+assert.equal(mosaicGeometry.captionCardStyle['--polaroid-caption-css-scale'], '1', 'caption scaling must start from one canonical scale before measurement')
+assert.equal(mosaicGeometry.dateCardStyle['--polaroid-date-font-size'], '34px', 'the date font must come from the canonical layout')
+assert.equal(mosaicGeometry.dateCardStyle['--polaroid-date-line-height-px'], '34px', 'the date line height must come from the canonical layout')
+const smallMosaicTypographyScale = getPolaroidTypographyScale(mosaicLayout, 160, mosaicLayout.caption.fontSize)
+assert.ok(Math.abs(smallMosaicTypographyScale.baseScale - 0.16) < 0.000001)
+assert.ok(Math.abs(smallMosaicTypographyScale.cssScale - 1 / 3) < 0.000001)
+assert.ok(Math.abs(smallMosaicTypographyScale.visualScale - 0.48) < 0.000001)
+assert.ok(Math.abs(smallMosaicTypographyScale.contentScale - 1 / 0.48) < 0.000001, 'small previews must preserve canonical caption proportions while keeping the computed font at least 12px')
 assert.deepEqual(mosaicGeometry.captionThumbnailStyle, { left: '31.8%', top: '75.8%', width: '64%', height: '16.8%' })
 const assertClose = (actual, expected, message) => assert.ok(Math.abs(actual - expected) < 0.000001, message)
 mosaicGeometry.sources.forEach(({ rect, cardStyle, thumbnailStyle }, index) => {

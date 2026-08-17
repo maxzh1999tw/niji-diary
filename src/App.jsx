@@ -1,8 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
 import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getSupportedFilmLayoutIds, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from './films.js'
-import { getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, scopeFilmRenderSvg } from './filmRendering.js'
+import { getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidTypographyScale, scopeFilmRenderSvg } from './filmRendering.js'
 import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
 import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
 import { formatText, translations } from './i18n.js'
@@ -758,10 +758,50 @@ function FilmPicker({ selectedFilmId, selectedLayoutId, unlockedFilmIds, lang, t
   </section>
 }
 
+function updatePolaroidTextScale(element, measuredWidth, layout, prefix, fontSize) {
+  const scale = getPolaroidTypographyScale(layout, measuredWidth, fontSize)
+  if (!element || !scale) return
+  element.style.setProperty(`--${prefix}-css-scale`, String(scale.cssScale))
+  element.style.setProperty(`--${prefix}-visual-scale`, String(scale.visualScale))
+  element.style.setProperty(`--${prefix}-content-width`, `${scale.contentScale * 100}%`)
+  element.style.setProperty(`--${prefix}-content-height`, `${scale.contentScale * 100}%`)
+}
+
+function usePolaroidTypography(geometry) {
+  const captionRef = useRef(null)
+  const dateRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const anchor = captionRef.current ?? dateRef.current
+    if (!anchor || !geometry) return undefined
+    const card = anchor.closest('.polaroid-card')
+    if (!card) return undefined
+
+    const updateScale = (measuredWidth = card.offsetWidth) => {
+      if (!Number.isFinite(measuredWidth) || measuredWidth <= 0) return
+      updatePolaroidTextScale(captionRef.current, measuredWidth, geometry.layout, 'polaroid-caption', geometry.layout.caption.fontSize)
+      updatePolaroidTextScale(dateRef.current, measuredWidth, geometry.layout, 'polaroid-date', geometry.layout.date.fontSize)
+      const captionVisualScale = Number(captionRef.current?.style.getPropertyValue('--polaroid-caption-visual-scale'))
+      if (captionRef.current && Number.isFinite(captionVisualScale) && captionVisualScale > 0) {
+        captionRef.current.style.setProperty('--polaroid-caption-padding', `${measuredWidth * 0.007 / captionVisualScale}px`)
+      }
+    }
+
+    updateScale()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(([entry]) => updateScale(entry?.contentRect.width))
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [geometry])
+
+  return { captionRef, dateRef }
+}
+
 function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, samples, labels, date, dateLabel, lang, filmId, layoutId = DEFAULT_LAYOUT_ID, className = '', photoClassName = '', imageLoading = 'lazy', decorative = false, children }) {
   const film = getFilm(filmId)
   const resolvedLayoutId = getFilmLayoutId(film, layoutId)
   const geometry = getPolaroidLayoutGeometry(resolvedLayoutId)
+  const { captionRef, dateRef } = usePolaroidTypography(geometry)
   const filmStyle = {
     ...getPolaroidLayoutStyle(resolvedLayoutId),
     '--film-paper-fallback': film.paper.middle,
@@ -769,18 +809,20 @@ function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photos, 
     '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
   }
   const mainPhoto = <div className={`polaroid-photo ${photoClassName}`}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div>
-  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}>{dateLabel ?? formatDate(date, lang, true)}</time></div>{interactionOverlay}</div>
+  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div ref={captionRef} className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}><span ref={dateRef} className="polaroid-date-text">{dateLabel ?? formatDate(date, lang, true)}</span></time></div>{interactionOverlay}</div>
 }
 
 function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
+  const storedGeometry = getPolaroidLayoutGeometry(item.layoutId)
+  const { captionRef } = usePolaroidTypography(item.polaroidImage ? storedGeometry : null)
   if (item.polaroidImage) {
     const caption = item.caption ?? t.defaultCaption
-    const geometry = getPolaroidLayoutGeometry(item.layoutId)
+    const geometry = storedGeometry
     const multiline = geometry.layout.id === MOSAIC_LAYOUT_ID
     return <div className={`polaroid-card stored-polaroid layout-${geometry.layout.id} ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
       <img src={item.polaroidImage} alt={alt} loading={imageLoading} />
       {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} layoutId={geometry.layout.id} /></div> : null}
-      <div className="stored-polaroid-caption-slot" style={geometry.captionCardStyle}>{editable ? <EditablePolaroidCaption value={caption} t={t} multiline={multiline} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
+      <div ref={captionRef} className="stored-polaroid-caption-slot" style={geometry.captionCardStyle}>{editable ? <EditablePolaroidCaption value={caption} t={t} multiline={multiline} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
     </div>
   }
   const caption = item.caption ?? t.defaultCaption

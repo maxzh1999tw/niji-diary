@@ -67,6 +67,15 @@ export function getPolaroidLayout(layoutId) {
   return POLAROID_LAYOUTS[layoutId] ?? POLAROID_LAYOUT
 }
 
+export function getPolaroidTypographyScale(layoutOrId = DEFAULT_LAYOUT_ID, measuredWidth, fontSize, minimumFontSize = 12) {
+  const layout = typeof layoutOrId === 'object' && layoutOrId ? layoutOrId : getPolaroidLayout(layoutOrId)
+  if (!Number.isFinite(measuredWidth) || measuredWidth <= 0 || !Number.isFinite(fontSize) || fontSize <= 0) return null
+  const baseScale = measuredWidth / layout.width
+  const cssScale = Math.max(baseScale, minimumFontSize / fontSize)
+  const visualScale = baseScale / cssScale
+  return Object.freeze({ baseScale, cssScale, visualScale, contentScale: 1 / visualScale })
+}
+
 const sourceRectsCache = new WeakMap()
 
 export function getPolaroidSourceRects(layoutOrId = DEFAULT_LAYOUT_ID) {
@@ -151,13 +160,22 @@ export function getPolaroidLayoutGeometry(layoutOrId = DEFAULT_LAYOUT_ID) {
   const captionCardStyle = Object.freeze({
     ...cardRectStyle(layout.caption, layout.width),
     alignItems: layout.caption.verticalAlign === 'top' ? 'flex-start' : 'center',
-    '--polaroid-caption-size': toCqw(layout.caption.fontSize),
-    '--polaroid-caption-line-height': String(layout.caption.lineHeight / layout.caption.fontSize),
-    '--polaroid-caption-line-limit': toCqw(layout.caption.height / Math.max(1, layout.caption.maxLines ?? 1)),
+    '--polaroid-caption-font-size': `${layout.caption.fontSize}px`,
+    '--polaroid-caption-line-height-px': `${layout.caption.lineHeight}px`,
+    '--polaroid-caption-css-scale': '1',
+    '--polaroid-caption-visual-scale': '1',
+    '--polaroid-caption-content-width': '100%',
+    '--polaroid-caption-content-height': '100%',
+    '--polaroid-caption-padding': '0.7cqw',
   })
   const dateCardStyle = Object.freeze({
     ...cardRectStyle(layout.date, layout.width),
-    '--polaroid-date-size': toCqw(layout.date.fontSize),
+    '--polaroid-date-font-size': `${layout.date.fontSize}px`,
+    '--polaroid-date-line-height-px': `${layout.date.fontSize}px`,
+    '--polaroid-date-css-scale': '1',
+    '--polaroid-date-visual-scale': '1',
+    '--polaroid-date-content-width': '100%',
+    '--polaroid-date-content-height': '100%',
   })
   const geometry = Object.freeze({
     layout,
