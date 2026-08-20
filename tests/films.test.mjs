@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { COLOR_KEYS } from '../src/colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmDaypartForHour, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, getSupportedFilmLayoutIds, isAllGreenRainbow, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from '../src/films.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_CHALLENGE_VERSION, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getCurrentCompletionStreak, getFilm, getFilmDaypartForHour, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getLongestCompletionStreak, getSupportedFilmLayoutIds, isAllGreenRainbow, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from '../src/films.js'
 import { translations } from '../src/i18n.js'
 
 const completed = (date, overrides = {}) => ({ date, completedAt: `${date}T12:00:00.000Z`, photos: {}, samples: {}, ...overrides })
@@ -48,9 +48,16 @@ const threeDayStreak = [completed('2026-08-01'), completed('2026-08-02'), comple
 assert.equal(getLongestCompletionStreak(threeDayStreak), 3)
 assert.equal(getFilmProgress(FILMS[2], threeDayStreak).met, true)
 assert.equal(getFilmProgress(FILMS[2], [completed('2026-08-01'), completed('2026-08-03')]).met, false)
+assert.equal(getCurrentCompletionStreak([completed('2026-08-01'), completed('2026-08-02')], '2026-08-03'), 2)
+assert.equal(getCurrentCompletionStreak([completed('2026-08-01'), completed('2026-08-02')], '2026-08-04'), 0, 'a missed day must reset the current streak before another record is made')
+assert.deepEqual(getFilmProgress(FILMS[2], [completed('2026-08-01'), completed('2026-08-02')], '2026-08-04'), { current: 0, target: 3, met: false })
+assert.deepEqual(getFilmProgress(FILMS[2], [completed('2026-08-01'), completed('2026-08-02'), completed('2026-08-04')], '2026-08-05'), { current: 1, target: 3, met: false })
 assert.deepEqual(getFilmProgressChanges(threeDayStreak.slice(0, 2), threeDayStreak), [
   { filmId: 'pink-pop', previous: 2, current: 3, target: 3, unlocked: true },
 ])
+assert.deepEqual(getFilmProgressChanges([completed('2026-08-01'), completed('2026-08-02')], [completed('2026-08-01'), completed('2026-08-02'), completed('2026-08-04')]).find((change) => change.filmId === 'pink-pop'), {
+  filmId: 'pink-pop', previous: 0, current: 1, target: 3, unlocked: false,
+}, 'a new streak must start from zero after a missed day')
 
 assert.equal(isAllGreenRainbow(greenRainbow), true)
 assert.equal(isAllGreenRainbow({ achievements: { allGreenRainbow: true } }), true)
@@ -142,6 +149,7 @@ assert.deepEqual(getFilmProgressChanges([morningRecord, middayRecord], [morningR
 
 const unlocked = normalizeFilmCollection(null, [...threeDayStreak, completed('2026-08-04', greenRainbow)])
 assert.deepEqual(unlocked.unlockedFilmIds, [DEFAULT_FILM_ID, 'sky-blue', 'pink-pop', 'mint-green'])
+assert.equal(normalizeFilmCollection(null, [...threeDayStreak, completed('2026-08-05')]).unlockedFilmIds.includes('pink-pop'), true, 'a previously met streak keeps the film unlocked after later gaps')
 assert.equal(unlocked.selectedFilmId, DEFAULT_FILM_ID)
 const preservedSelection = normalizeFilmCollection({ schemaVersion: 1, unlockedFilmIds: [DEFAULT_FILM_ID, 'mint-green'], selectedFilmId: 'mint-green' }, [])
 assert.equal(preservedSelection.selectedFilmId, 'mint-green', 'an existing unlocked selection must survive the expanded film catalog')

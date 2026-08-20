@@ -1784,7 +1784,7 @@ function DeletePolaroidDialog({ day, lang, t, deleting, onCancel, onConfirm }) {
   return <div className="delete-confirm-scrim"><button className="delete-confirm-dismiss" type="button" onClick={onCancel} aria-label={t.cancelDelete} disabled={deleting} /><section className="delete-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" onKeyDown={handleDialogKeyDown}><span className="delete-dialog-icon"><Icon name="trash" size={34} /></span><div><span className="chrome-kicker">DELETE POLAROID?</span><h2 id="delete-dialog-title">{t.deleteTitle}</h2><p id="delete-dialog-description">{formatText(t.deleteMessage, { date: displayDate })}</p></div><div className="delete-dialog-actions"><button ref={cancelRef} type="button" onClick={onCancel} disabled={deleting}>{t.cancelDelete}</button><button className="confirm-delete" type="button" onClick={onConfirm} disabled={deleting}><Icon name="trash" size={19} />{deleting ? t.deletingPolaroid : t.confirmDelete}</button></div></section></div>
 }
 
-function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onSelectLayout }) {
+function FilmsScreen({ completedDays, date, filmCollection, lang, t, onSelectFilm, onSelectLayout }) {
   const [filter, setFilter] = useState('all')
   const unlocked = new Set(filmCollection.unlockedFilmIds)
   const visibleFilms = [...FILMS.filter((film) => filter === 'all' || (filter === 'unlocked' ? unlocked.has(film.id) : !unlocked.has(film.id)))].sort((left, right) => {
@@ -1804,7 +1804,7 @@ function FilmsScreen({ completedDays, filmCollection, lang, t, onSelectFilm, onS
       {visibleFilms.length ? visibleFilms.map((film) => {
         const isUnlocked = unlocked.has(film.id)
         const isSelected = filmCollection.selectedFilmId === film.id
-        const progress = getFilmProgress(film, completedDays)
+        const progress = getFilmProgress(film, completedDays, date)
         const collectedDayparts = film.unlock.type === 'distinct-dayparts' ? new Set(getCollectedFilmDayparts(completedDays)) : null
         const additionalLayoutIds = getSupportedFilmLayoutIds(film.id).filter((layoutId) => layoutId !== DEFAULT_LAYOUT_ID)
         return <article className={`film-card ${film.className} ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'is-selected' : ''}`} key={film.id} role="listitem">
@@ -2529,7 +2529,7 @@ export default function App() {
     : activeTab === 'archive'
     ? <ArchiveScreen history={history} lang={lang} t={t} onOpen={setSelectedDay} onRequestDelete={requestDeletePolaroid} />
     : activeTab === 'films'
-      ? <FilmsScreen completedDays={history} filmCollection={filmCollection} lang={lang} t={t} onSelectFilm={selectFilm} onSelectLayout={selectLayout} />
+      ? <FilmsScreen completedDays={history} date={date} filmCollection={filmCollection} lang={lang} t={t} onSelectFilm={selectFilm} onSelectLayout={selectLayout} />
       : activeTab === 'settings'
       ? <SettingsScreen lang={lang} setLang={setLang} t={t} migrationEnabled={location.origin === LEGACY_ORIGIN} migrationState={migrationState} onMigrate={handleLegacyMigration} onOpenInfo={navigateInfo} />
       : staged

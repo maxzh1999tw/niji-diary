@@ -349,9 +349,14 @@ function completedDates(completedDays = []) {
     .map((day) => day.date))].sort()
 }
 
+function dateTimestamp(date) {
+  const timestamp = Date.parse(`${date}T12:00:00Z`)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
 function isNextDay(previousDate, currentDate) {
-  const previous = Date.parse(`${previousDate}T12:00:00Z`)
-  const current = Date.parse(`${currentDate}T12:00:00Z`)
+  const previous = dateTimestamp(previousDate)
+  const current = dateTimestamp(currentDate)
   return Number.isFinite(previous) && Number.isFinite(current) && current - previous === DAY_IN_MS
 }
 
@@ -367,6 +372,23 @@ export function getLongestCompletionStreak(completedDays = []) {
   }
 
   return longest
+}
+
+export function getCurrentCompletionStreak(completedDays = [], referenceDate) {
+  const dates = completedDates(completedDays)
+  const latestDate = dates.at(-1)
+  if (!latestDate) return 0
+
+  const latestTimestamp = dateTimestamp(latestDate)
+  const referenceTimestamp = DATE_PATTERN.test(referenceDate ?? '') ? dateTimestamp(referenceDate) : null
+  if (Number.isFinite(latestTimestamp) && Number.isFinite(referenceTimestamp) && referenceTimestamp - latestTimestamp > DAY_IN_MS) return 0
+
+  let streak = 1
+  for (let index = dates.length - 2; index >= 0; index -= 1) {
+    if (!isNextDay(dates[index], dates[index + 1])) break
+    streak += 1
+  }
+  return streak
 }
 
 function parseColor(value) {
@@ -483,12 +505,12 @@ export function getCollectedFilmDayparts(completedDays = []) {
   return FILM_DAYPART_KEYS.filter((daypart) => collected.has(daypart))
 }
 
-export function getFilmProgress(film, completedDays = []) {
+export function getFilmProgress(film, completedDays = [], referenceDate) {
   const target = film.unlock.target
   let current = 0
 
   if (film.unlock.type === 'completed-count') current = completedDates(completedDays).length
-  if (film.unlock.type === 'consecutive-days') current = getLongestCompletionStreak(completedDays)
+  if (film.unlock.type === 'consecutive-days') current = getCurrentCompletionStreak(completedDays, referenceDate)
   if (film.unlock.type === 'all-green-rainbow') current = countAllGreenRainbows(completedDays)
   if (film.unlock.type === 'achievement') current = countFilmAchievement(completedDays, film.unlock.achievement)
   if (film.unlock.type === 'distinct-dayparts') current = getCollectedFilmDayparts(completedDays).length
@@ -498,10 +520,11 @@ export function getFilmProgress(film, completedDays = []) {
 }
 
 export function getFilmProgressChanges(previousCompletedDays = [], nextCompletedDays = []) {
+  const referenceDate = completedDates(nextCompletedDays).at(-1)
   return FILMS.flatMap((film) => {
     if (film.unlock.type === 'always') return []
-    const previous = getFilmProgress(film, previousCompletedDays)
-    const next = getFilmProgress(film, nextCompletedDays)
+    const previous = getFilmProgress(film, previousCompletedDays, referenceDate)
+    const next = getFilmProgress(film, nextCompletedDays, referenceDate)
     if (next.current <= previous.current) return []
     return [{
       filmId: film.id,
@@ -515,7 +538,9 @@ export function getFilmProgressChanges(previousCompletedDays = [], nextCompleted
 
 export function getDerivedUnlockedFilmIds(completedDays = []) {
   return FILMS
-    .filter((film) => getFilmProgress(film, completedDays).met)
+    .filter((film) => film.unlock.type === 'consecutive-days'
+      ? getLongestCompletionStreak(completedDays) >= film.unlock.target
+      : getFilmProgress(film, completedDays).met)
     .map((film) => film.id)
 }
 
