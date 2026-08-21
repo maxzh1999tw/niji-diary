@@ -55,6 +55,51 @@ export const translations = {
   },
 }
 
+export const LANGUAGE_STORAGE_KEY = 'niji-language'
+
+const SUPPORTED_LANGUAGES = new Set(Object.keys(translations))
+const DEFAULT_LANGUAGE = 'zh-Hant'
+
+function getBrowserStorage() {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+function getBrowserNavigator() {
+  try {
+    return typeof navigator === 'undefined' ? null : navigator
+  } catch {
+    return null
+  }
+}
+
+function isChineseLocale(locale) {
+  const normalizedLocale = locale.trim().toLowerCase().replaceAll('_', '-')
+  return normalizedLocale === 'zh' || normalizedLocale.startsWith('zh-')
+}
+
+export function detectLanguageFromLocales(locales = []) {
+  const preferredLocale = locales.find((locale) => typeof locale === 'string' && locale.trim())
+  if (!preferredLocale) return DEFAULT_LANGUAGE
+  return isChineseLocale(preferredLocale) ? 'zh-Hant' : 'en'
+}
+
+export function getInitialLanguage({ storage = getBrowserStorage(), navigatorLike = getBrowserNavigator() } = {}) {
+  let storedLanguage = null
+  try {
+    storedLanguage = storage?.getItem(LANGUAGE_STORAGE_KEY)
+  } catch {
+    // Some privacy modes expose localStorage but reject reads. Use device detection instead.
+  }
+  if (SUPPORTED_LANGUAGES.has(storedLanguage)) return storedLanguage
+
+  const preferredLocales = Array.isArray(navigatorLike?.languages) ? navigatorLike.languages : []
+  return detectLanguageFromLocales([...preferredLocales, navigatorLike?.language])
+}
+
 export function formatText(text, values = {}) {
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), text)
 }

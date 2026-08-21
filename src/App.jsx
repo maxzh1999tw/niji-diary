@@ -5,7 +5,7 @@ import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomC
 import { getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidTypographyScale, scopeFilmRenderSvg } from './filmRendering.js'
 import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
 import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
-import { formatText, translations } from './i18n.js'
+import { formatText, getInitialLanguage, LANGUAGE_STORAGE_KEY, translations } from './i18n.js'
 import { INFO_PAGE_KEYS, TAB_KEYS, infoHash, parseAppHash } from './appRoutes.js'
 import { INFO_PAGE_META, infoContent } from './infoContent.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
@@ -2002,7 +2002,7 @@ function DevelopedCard({ day, lang, t, exporting, onSave, onShare, onDone, onCap
 }
 
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem('niji-language') || 'zh-Hant')
+  const [lang, setLang] = useState(() => getInitialLanguage())
   const [activeTab, setActiveTab] = useState(() => parseAppHash(location.hash).tab)
   const [infoPage, setInfoPage] = useState(() => parseAppHash(location.hash).infoPage)
   const [day, setDay] = useState(null)
@@ -2134,7 +2134,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang
-    localStorage.setItem('niji-language', lang)
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
   }, [lang])
 
   useEffect(() => {
