@@ -2426,7 +2426,7 @@ export default function App() {
       const polaroidImage = await getCompletedPolaroidImage(target, lang, t.defaultCaption)
       const filename = `niji-polaroid-${target.date}.jpg`
       const file = dataUrlToFile(polaroidImage, filename)
-      const shareData = file ? createPolaroidShareData(file, { title: t.shareTitle, text: t.shareText }) : null
+      const shareData = file ? createPolaroidShareData(file, { title: t.shareTitle, text: formatText(t.shareText, { url: NEW_APP_URL }) }) : null
       if (shareData && navigator.canShare?.(shareData)) {
         await navigator.share(shareData)
         showMessage(t.shared)
