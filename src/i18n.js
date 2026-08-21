@@ -81,10 +81,17 @@ function isChineseLocale(locale) {
   return normalizedLocale === 'zh' || normalizedLocale.startsWith('zh-')
 }
 
+function isJapaneseLocale(locale) {
+  const normalizedLocale = locale.trim().toLowerCase().replaceAll('_', '-')
+  return normalizedLocale === 'ja' || normalizedLocale.startsWith('ja-')
+}
+
 export function detectLanguageFromLocales(locales = []) {
   const preferredLocale = locales.find((locale) => typeof locale === 'string' && locale.trim())
   if (!preferredLocale) return DEFAULT_LANGUAGE
-  return isChineseLocale(preferredLocale) ? 'zh-Hant' : 'en'
+  if (isChineseLocale(preferredLocale)) return 'zh-Hant'
+  if (isJapaneseLocale(preferredLocale)) return 'ja'
+  return 'en'
 }
 
 export function getInitialLanguage({ storage = getBrowserStorage(), navigatorLike = getBrowserNavigator() } = {}) {

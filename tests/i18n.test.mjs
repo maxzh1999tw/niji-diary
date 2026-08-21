@@ -5,8 +5,12 @@ for (const locale of ['zh', 'zh-CN', 'zh-SG', 'zh-Hans', 'zh-TW', 'zh-HK', 'zh-M
   assert.equal(detectLanguageFromLocales([locale]), 'zh-Hant', `${locale} should use Traditional Chinese`)
 }
 
-for (const locale of ['en-US', 'ja-JP', 'ko-KR', 'fr-FR']) {
+for (const locale of ['en-US', 'ko-KR', 'fr-FR']) {
   assert.equal(detectLanguageFromLocales([locale]), 'en', `${locale} should use English`)
+}
+
+for (const locale of ['ja', 'ja-JP']) {
+  assert.equal(detectLanguageFromLocales([locale]), 'ja', `${locale} should use Japanese`)
 }
 
 assert.equal(detectLanguageFromLocales(['', 'zh-TW']), 'zh-Hant')
@@ -19,6 +23,10 @@ assert.equal(
 assert.equal(
   getInitialLanguage({ storage: { getItem: () => null }, navigatorLike: { languages: ['zh-HK'], language: 'en-US' } }),
   'zh-Hant',
+)
+assert.equal(
+  getInitialLanguage({ storage: { getItem: () => null }, navigatorLike: { languages: [], language: 'ja-JP' } }),
+  'ja',
 )
 assert.equal(
   getInitialLanguage({ storage: { getItem: () => 'unsupported' }, navigatorLike: { languages: ['de-DE'], language: 'de-DE' } }),
