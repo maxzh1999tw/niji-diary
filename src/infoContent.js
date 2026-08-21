@@ -8,7 +8,7 @@ export const INFO_PAGE_META = Object.freeze([
 ])
 
 const links = {
-  issues: { label: 'GitHub Issues', href: 'https://github.com/maxzh1999tw/niji-diary/issues' },
+  reportEmail: { label: '54bp6cl6@gmail.com', href: 'mailto:54bp6cl6@gmail.com' },
   taiwanLaw: { label: '個人資料保護法', href: 'https://law.moj.gov.tw/LawClass/LawAll.aspx?PCode=I0050021' },
   cloudflare: { label: 'Cloudflare 隱私權政策', href: 'https://www.cloudflare.com/privacypolicy/' },
   googlePartners: { label: 'Google 如何使用合作夥伴網站資料', href: 'https://policies.google.com/technologies/partner-sites' },
@@ -62,7 +62,7 @@ export const infoContent = {
     contact: {
       label: '聯絡方式', kicker: 'CONTACT', summary: '回報錯誤、提出建議，或詢問隱私與條款問題。',
       sections: [
-        { title: '公開聯絡管道', paragraphs: ['目前請使用專案的 GitHub Issues。這是公開頁面，其他人可能看見你提交的內容。'], links: [links.issues] },
+        { title: '回報信箱', paragraphs: ['請將錯誤、建議，或隱私與條款問題寄至以下信箱：'], links: [links.reportEmail] },
         { title: '回報時可以附上', bullets: ['瀏覽器與作業系統版本。', '發生問題的頁面、操作步驟與預期結果。', '已遮住私人資訊的畫面截圖。'] },
         { title: '請勿公開提供', bullets: ['私人照片、日記文字或即時位置。', '身分證件、電話、地址、帳號密碼或付款資訊。', '任何你不希望出現在公開網路上的內容。'] },
         { title: '關於本機資料', paragraphs: ['營運者看不到你瀏覽器中的照片與日記，也無法代為取回或刪除。請在相簿刪除單筆紀錄，或在瀏覽器網站設定中清除本網站的全部資料。'] },
@@ -102,13 +102,13 @@ const japaneseLabels = {
 function translatedSummaryPages(labels, language) {
   const localizedLinks = language === 'en'
     ? {
-      issues: links.issues,
+      reportEmail: links.reportEmail,
       cloudflare: { ...links.cloudflare, label: 'Cloudflare Privacy Policy' },
       googlePartners: { ...links.googlePartners, label: 'How Google uses data from partner sites' },
       googleAds: { ...links.googleAds, label: 'Google ad settings' },
     }
     : {
-      issues: links.issues,
+      reportEmail: links.reportEmail,
       cloudflare: { ...links.cloudflare, label: 'Cloudflare プライバシーポリシー' },
       googlePartners: { ...links.googlePartners, label: 'パートナーサイトでの Google のデータ利用' },
       googleAds: { ...links.googleAds, label: 'Google 広告設定' },
@@ -119,7 +119,7 @@ function translatedSummaryPages(labels, language) {
       guide: [['Complete a rainbow', ['Capture or choose an image, sample a point, classify the color, and repeat for all seven colors. Then choose a background, adjust the rainbow, and develop your Polaroid.']], ['Why is a finished day locked?', ['Finishing archives the daily quest so streak and film progress stay consistent. You can still edit the caption or delete the entry from the album.']], ['Does it sync?', ['No. Each browser profile and device stores its own copy.']], ['Install, offline use, and deletion', ['Use your browser’s Install or Add to Home Screen command. Most features work offline after the first load. Delete one entry from the album, or clear all data for niji.mia-and-max.com in browser site settings; deletion cannot be undone.']]],
       privacy: [['Data stored locally', ['No name, email, or account is required. Photos, colors, text, dates, completion state, film settings, and language are stored with IndexedDB, localStorage, Cache Storage, and a Service Worker until you or the browser removes them. The operator cannot access, recover, or remotely delete this content.']], ['Network services', ['Cloudflare Pages may process IP, routing, system, and traffic data to deliver and protect the site. Google Fonts may receive technical request data such as IP address and browser information.']], ['Sharing and migration', ['Content leaves the app only when you choose a download/share target or start the old-site migration. The migration transfers data directly between site windows, not through a Niji Diary server.']], ['Ads, choices, and minors', ['Google ads and analytics are not currently enabled. Any future use will be disclosed with applicable consent choices and will not receive your photos, sampled colors, or diary text. You can delete local data, control third-party cookies, and contact us about policy questions. Minors should use the app with guardian awareness.']]],
       terms: [['Service and your content', ['Niji Diary is a free personal creative tool provided as-is. You retain rights to your photos and text, and grant no publishing license because content is not uploaded by default. Sharing is subject to the destination platform’s terms.']], ['Backups and availability', ['The service does not guarantee uninterrupted access, compatibility, or permanent retention. Browser changes, device failure, or cleared storage may remove data; download important work.']], ['Acceptable use', ['Do not use the service unlawfully, infringe others’ rights, disrupt security, distribute malware, or send abusive automated traffic. Use only content you have the right to use.']], ['Third parties and law', ['Hosting, fonts, links, and future ads follow their providers’ terms. Ads would not be endorsements. These terms are governed by the laws of Taiwan, with jurisdiction determined by applicable law.']]],
-      contact: [['Public support channel', ['Use GitHub Issues for now. It is public, so do not post private photos, diary text, live location, identity documents, passwords, addresses, or payment data.']], ['Helpful details', ['Include your browser and operating system versions, the page and steps involved, the expected result, and only screenshots with private information hidden.']], ['Local data requests', ['The operator cannot see or remove browser-local content. Delete an entry in the album or clear all site data in browser settings.']]],
+      contact: [['Report by email', ['Send bug reports, suggestions, or privacy and terms questions to the report mailbox below.']], ['Helpful details', ['Include your browser and operating system versions, the page and steps involved, the expected result, and only screenshots with private information hidden.']], ['Local data requests', ['The operator cannot see or remove browser-local content. Delete an entry in the album or clear all site data in browser settings.']]],
       ads: [['Current status', ['Niji Diary currently serves no Google ads and uses no advertising cookies or ad identifiers. Core features do not require an ad.']], ['Local storage and network services', ['IndexedDB and localStorage save diary and settings; Cache Storage and a Service Worker support loading and offline use. These are not used for cross-site ad tracking. Cloudflare and Google Fonts may still process necessary technical connection data.']], ['If Google ads are added', ['Google and partners may use cookies, IP address, device/browser information, ad identifiers, and interactions for ad delivery, measurement, and abuse prevention. Photos, sampled colors, and diary text will not be provided to ad services.']], ['Rewarded-ad rules', ['Watching will be optional with the reward stated first. Declining will not affect normal diary, color, album, or existing film features. No reward is promised if an ad does not load or complete verification. Applicable consent controls will be provided by region.']]],
     }
     : {
@@ -127,12 +127,12 @@ function translatedSummaryPages(labels, language) {
       guide: [['虹を完成する', ['写真を撮るか選び、場所をタップして色を採取し、七色に分類します。七色がそろったら背景と虹を調整して現像します。']], ['完成後に編集できない理由', ['完成はその日のクエストを保存する操作です。連続日数とフィルム進捗を正しく保つためロックされますが、文字の編集と記録の削除は可能です。']], ['同期とオフライン', ['端末間同期はありません。ブラウザの「インストール」または「ホーム画面に追加」を使えます。初回読み込み後は多くの機能をオフラインで使えます。']], ['削除方法', ['アルバムから1件ずつ削除できます。全削除はブラウザ設定で niji.mia-and-max.com のサイトデータを消去してください。元に戻せません。']]],
       privacy: [['端末内のデータ', ['氏名、メール、アカウントは不要です。写真、色、文字、日付、完成状態、フィルム、言語は IndexedDB、localStorage、Cache Storage、Service Worker に保存されます。運営者は閲覧、復元、遠隔削除できません。']], ['通信サービス', ['Cloudflare Pages は配信と保護のため IP、ルーティング、システム、通信データを処理する場合があります。Google Fonts は IP やブラウザなどの技術情報を受け取る場合があります。']], ['共有と移行', ['ダウンロード、共有先の選択、旧サイト移行を自分で開始した場合のみ内容が渡されます。移行はサイトのウィンドウ間で行い、拾色日記サーバーを経由しません。']], ['広告・選択・未成年', ['現在 Google 広告と解析は使っていません。将来使う場合は必要な同意手段を用意し、写真、採取色、日記本文を広告サービスへ渡しません。未成年は保護者の理解のもとで利用してください。']]],
       terms: [['サービスとコンテンツ', ['拾色日記は無料の個人向け創作ツールを現状のまま提供します。写真と文字の権利は利用者にあり、通常はアップロードされないため運営者への公開利用許諾もありません。']], ['保存と可用性', ['中断のない提供、永続的な互換性、データ保存は保証しません。ブラウザ変更、端末故障、保存領域の消去で失われる場合があるため、重要な作品は保存してください。']], ['禁止事項', ['違法利用、権利侵害、セキュリティ妨害、マルウェア配布、大量の自動アクセスは禁止します。使用権限のある写真と文字だけを利用してください。']], ['外部サービスと法律', ['ホスティング、フォント、リンク、将来の広告には各社の規約が適用されます。台湾法を準拠法とし、管轄は適用法に従います。']]],
-      contact: [['公開窓口', ['現在は GitHub Issues を利用してください。公開ページなので、写真、日記、現在地、本人確認書類、パスワード、住所、決済情報は投稿しないでください。']], ['役立つ情報', ['ブラウザと OS のバージョン、ページ、操作手順、期待した結果、個人情報を隠した画面をお知らせください。']], ['端末内データ', ['運営者は端末内データを確認・削除できません。アルバムで削除するか、ブラウザ設定から全サイトデータを消去してください。']]],
+      contact: [['メールでのご連絡', ['不具合、提案、プライバシーや規約に関するお問い合わせは、下記の連絡先へお送りください。']], ['役立つ情報', ['ブラウザと OS のバージョン、ページ、操作手順、期待した結果、個人情報を隠した画面をお知らせください。']], ['端末内データ', ['運営者は端末内データを確認・削除できません。アルバムで削除するか、ブラウザ設定から全サイトデータを消去してください。']]],
       ads: [['現在の状態', ['現在 Google 広告、広告 Cookie、広告 ID は使用していません。基本機能に広告視聴は不要です。']], ['保存技術と通信', ['IndexedDB と localStorage は日記と設定、Cache Storage と Service Worker は読み込みとオフライン利用に使います。サイト横断広告追跡には使いません。Cloudflare と Google Fonts は必要な通信データを処理する場合があります。']], ['将来 Google 広告を導入する場合', ['Google とパートナーは Cookie、IP、端末・ブラウザ、広告 ID、操作情報を配信、測定、不正防止に使う場合があります。写真、採取色、日記本文は広告サービスに渡しません。']], ['リワード広告の原則', ['視聴は任意で、開始前に報酬を示します。拒否しても日記、採色、アルバム、既存フィルムに影響しません。読み込みや検証が完了しない場合、報酬は保証されません。地域に応じた同意手段を用意します。']]],
     }
 
   return Object.fromEntries(Object.entries(labels).map(([key, [label, kicker, summary]]) => {
-    const pageLinks = key === 'contact' ? [localizedLinks.issues] : key === 'privacy' ? [localizedLinks.cloudflare, localizedLinks.googlePartners] : key === 'ads' ? [localizedLinks.googlePartners, localizedLinks.googleAds] : []
+    const pageLinks = key === 'contact' ? [localizedLinks.reportEmail] : key === 'privacy' ? [localizedLinks.cloudflare, localizedLinks.googlePartners] : key === 'ads' ? [localizedLinks.googlePartners, localizedLinks.googleAds] : []
     return [key, {
       label, kicker, summary,
       status: key === 'ads' ? (language === 'en' ? 'Ads are currently off' : '現在、広告はありません') : undefined,

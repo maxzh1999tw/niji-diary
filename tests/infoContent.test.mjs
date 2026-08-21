@@ -18,7 +18,7 @@ for (const lang of ['zh-Hant', 'en', 'ja']) {
       assert.ok(section.title?.trim(), `${lang}/${key} section has a title`)
       assert.ok(section.paragraphs?.length || section.bullets?.length, `${lang}/${key}/${section.title} has content`)
       for (const link of section.links ?? []) {
-        assert.match(link.href, /^https:\/\//, `${link.label} uses HTTPS`)
+        assert.match(link.href, /^(?:https:\/\/|mailto:)/, `${link.label} uses a supported link protocol`)
       }
     }
   }
@@ -26,5 +26,17 @@ for (const lang of ['zh-Hant', 'en', 'ja']) {
 
 assert.match(infoContent['zh-Hant'].privacy.sections.map(({ paragraphs = [] }) => paragraphs.join(' ')).join(' '), /無法讀取、代為復原或遠端刪除/)
 assert.match(infoContent['zh-Hant'].ads.sections[0].paragraphs.join(' '), /目前沒有/)
+
+for (const lang of ['zh-Hant', 'en', 'ja']) {
+  const contact = infoContent[lang].contact
+  const contactLinks = contact.sections.flatMap(({ links = [] }) => links)
+  const contactText = contact.sections
+    .flatMap(({ paragraphs = [], bullets = [] }) => [...paragraphs, ...bullets])
+    .concat(contactLinks.map(({ label }) => label))
+    .join(' ')
+  assert.match(contactText, /54bp6cl6@gmail\.com/, `${lang}/contact includes the report email`)
+  assert.doesNotMatch(contactText, /github/i, `${lang}/contact does not mention GitHub`)
+  assert.deepEqual(contactLinks.map(({ href }) => href), ['mailto:54bp6cl6@gmail.com'], `${lang}/contact only links to the report email`)
+}
 
 console.log('Information content: all six pages are complete in Traditional Chinese, English, and Japanese.')
