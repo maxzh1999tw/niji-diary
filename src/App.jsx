@@ -11,6 +11,7 @@ import { INFO_PAGE_META, infoContent } from './infoContent.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { importStorageSnapshot, LEGACY_IMPORT_OFFER, LEGACY_IMPORT_READY, LEGACY_IMPORT_RESPONSE, LEGACY_ORIGIN, NEW_APP_ORIGIN, sendLegacyStorageToNewSite } from './migration.js'
 import { appendModalHistoryToken, clearModalHistoryState, createModalHistoryToken, getModalHistoryStack, removeModalHistoryToken } from './modalNavigation.js'
+import { createPolaroidShareData } from './sharing.js'
 import { COMPLETED_DAY_SCHEMA_VERSION, completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
 const LANGUAGE_LABELS = { 'zh-Hant': '繁體中文', en: 'English', ja: '日本語' }
@@ -2425,8 +2426,9 @@ export default function App() {
       const polaroidImage = await getCompletedPolaroidImage(target, lang, t.defaultCaption)
       const filename = `niji-polaroid-${target.date}.jpg`
       const file = dataUrlToFile(polaroidImage, filename)
-      if (file && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: t.shareTitle, text: target.caption ?? t.defaultCaption })
+      const shareData = file ? createPolaroidShareData(file, { title: t.shareTitle, text: t.shareText }) : null
+      if (shareData && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData)
         showMessage(t.shared)
       } else {
         downloadPolaroid(polaroidImage, target)
