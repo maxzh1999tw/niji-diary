@@ -14,6 +14,12 @@ assert.deepEqual(payload, {
   url: NEW_APP_URL,
 })
 
+assert.deepEqual(createPolaroidShareData(file, { title: '今天的彩虹', text: shareText }, { includeUrl: false }), {
+  files: [file],
+  title: '今天的彩虹',
+  text: shareText,
+})
+
 for (const lang of ['zh-Hant', 'en', 'ja']) {
   assert.doesNotMatch(formatText(translations[lang].shareText, { url: NEW_APP_URL }), /\{url\}/)
 }

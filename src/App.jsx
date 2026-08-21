@@ -1871,7 +1871,7 @@ function SettingsScreen({ lang, setLang, t, migrationEnabled, migrationState, on
           </button>)}
         </div>
       </section>
-      <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v1.0.11 · Max Edition</small></div>
+      <div className="about-sticker"><span>NIJI</span><b>拾色日記</b><small>v1.0.12 · Max Edition</small></div>
     </section>
   )
 }
@@ -2426,9 +2426,20 @@ export default function App() {
       const polaroidImage = await getCompletedPolaroidImage(target, lang, t.defaultCaption)
       const filename = `niji-polaroid-${target.date}.jpg`
       const file = dataUrlToFile(polaroidImage, filename)
-      const shareData = file ? createPolaroidShareData(file, { title: t.shareTitle, text: formatText(t.shareText, { url: NEW_APP_URL }) }) : null
-      if (shareData && navigator.canShare?.(shareData)) {
-        await navigator.share(shareData)
+      const shareText = formatText(t.shareText, { url: NEW_APP_URL })
+      const shareData = file ? createPolaroidShareData(file, { title: t.shareTitle, text: shareText }) : null
+      const compatibleShareData = file
+        ? createPolaroidShareData(file, { title: t.shareTitle, text: shareText }, { includeUrl: false })
+        : null
+      const canShareFiles = file && typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })
+      if (shareData && canShareFiles) {
+        try {
+          const canShareFullData = navigator.canShare?.(shareData)
+          await navigator.share(canShareFullData ? shareData : compatibleShareData)
+        } catch (error) {
+          if (error?.name === 'AbortError') throw error
+          await navigator.share(compatibleShareData)
+        }
         showMessage(t.shared)
       } else {
         downloadPolaroid(polaroidImage, target)
