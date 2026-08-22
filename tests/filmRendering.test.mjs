@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, FILMS, getFilmArtwork, MOSAIC_LAYOUT_ID } from '../src/films.js'
-import { createFilmOverlaySvg, createFilmSurfaceSvg, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, getPolaroidTypographyScale, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
+import { createFilmOverlaySvg, createFilmSurfaceSvg, createPolaroidRenderScene, getFilmRenderModel, getPolaroidLayout, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidSourceRects, getPolaroidTypographyScale, layoutPolaroidCaptionText, MOSAIC_POLAROID_LAYOUT, POLAROID_LAYOUT, POLAROID_RENDER_LAYER_IDS, POLAROID_SOURCE_FRAME, scopeFilmRenderSvg } from '../src/filmRendering.js'
 
 function relativeLuminance(hex) {
   const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255)
@@ -39,6 +39,19 @@ const mosaicSources = getPolaroidSourceRects(mosaicLayout)
 const mosaicGeometry = getPolaroidLayoutGeometry(mosaicLayout)
 const classicGeometry = getPolaroidLayoutGeometry(POLAROID_LAYOUT)
 const classicSources = getPolaroidSourceRects(POLAROID_LAYOUT)
+const classicScene = createPolaroidRenderScene({
+  date: '2026-08-20',
+  caption: 'Hello',
+  filmId: DEFAULT_FILM_ID,
+  layoutId: DEFAULT_LAYOUT_ID,
+  cardImage: 'main-photo',
+  photos: { red: 'red-photo' },
+  samples: { red: '#ff527b' },
+}, {
+  fallbackCaption: 'fallback',
+  dateLabel: '2026/08/20',
+  fallbackSamples: { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', green: '#42d67a', blue: '#25a9f0', indigo: '#655ee8', violet: '#b34ee5' },
+})
 assert.equal(mosaicLayout, MOSAIC_POLAROID_LAYOUT)
 assert.equal(mosaicLayout.photo.width / mosaicLayout.photo.height, 4 / 5, 'the new layout must preserve the main photo ratio')
 assert.equal(mosaicSources.length, 7)
@@ -77,6 +90,31 @@ assert.equal(mosaicLayout.date.y, 1401, 'the date row must move below the taller
 assert.equal(mosaicLayout.date.baselineY, 1444, 'the date baseline must move with the date row')
 assert.equal(mosaicGeometry.sourceRects, mosaicSources, 'DOM, thumbnail, and export geometry must reuse the same immutable source rectangles')
 assert.equal(getPolaroidLayoutGeometry(MOSAIC_LAYOUT_ID), mosaicGeometry, 'layout geometry must be cached as one immutable render contract')
+assert.deepEqual(classicScene.layers.map(({ id }) => id), [
+  POLAROID_RENDER_LAYER_IDS.surface,
+  POLAROID_RENDER_LAYER_IDS.photo,
+  'source-red',
+  'source-orange',
+  'source-yellow',
+  'source-green',
+  'source-blue',
+  'source-indigo',
+  'source-violet',
+  POLAROID_RENDER_LAYER_IDS.overlay,
+  POLAROID_RENDER_LAYER_IDS.caption,
+  POLAROID_RENDER_LAYER_IDS.date,
+], 'scene layer order must stay identical across DOM, export, and repair adapters')
+assert.equal(classicScene.layout.id, DEFAULT_LAYOUT_ID, 'scene must preserve the classic layout id for legacy records')
+assert.equal(classicScene.geometry, classicGeometry, 'scene geometry must reuse the same immutable geometry contract as the DOM preview')
+assert.equal(classicScene.sourceLayers[0].rect, classicGeometry.sources[0].rect, 'scene source rects must point to the shared geometry rectangles')
+assert.equal(classicScene.layers.find((layer) => layer.kind === 'photo').rect, classicGeometry.photo, 'scene photo layer must reuse the shared photo rectangle')
+assert.equal(classicScene.layers.find((layer) => layer.kind === 'caption').cardStyle, classicGeometry.captionCardStyle, 'scene caption layer must reuse the shared DOM caption geometry')
+assert.equal(classicScene.layers.find((layer) => layer.kind === 'date').cardStyle, classicGeometry.dateCardStyle, 'scene date layer must reuse the shared DOM date geometry')
+assert.equal(classicScene.captionText, 'Hello')
+assert.equal(classicScene.dateText, '2026/08/20')
+assert.deepEqual(classicScene.repair.clearRect, { x: 0, y: 1348, width: 670, height: 152 }, 'captionless repair must derive from the shared footer contract without changing the baked-image repair output')
+assert.deepEqual(layoutPolaroidCaptionText('ABCD', 2, 1, (value) => value.length), { lines: ['A…'], truncated: true }, 'caption layout helper must truncate with an ellipsis using the shared canvas rule')
+assert.deepEqual(layoutPolaroidCaptionText('A\nB', 10, 2, (value) => value.length), { lines: ['A', 'B'], truncated: false }, 'caption layout helper must preserve explicit line breaks inside the shared max-line contract')
 assert.equal(mosaicGeometry.photo, mosaicLayout.photo)
 assert.deepEqual(mosaicGeometry.photoCardStyle, { left: '31.8cqw', top: '31.1cqw', width: '64cqw', height: '80cqw' })
 assert.deepEqual(mosaicGeometry.photoThumbnailStyle, { left: '31.8%', top: '20.733333%', width: '64%', height: '53.333333%' })
@@ -118,6 +156,10 @@ mosaicGeometry.sources.forEach(({ rect, cardStyle, thumbnailStyle }, index) => {
 assert.notEqual(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID), getFilmRenderModel(DEFAULT_FILM_ID), 'render models must be cached per film and layout')
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).layout, MOSAIC_POLAROID_LAYOUT)
 assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).geometry, mosaicGeometry)
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).surfaceCacheKey, 'film-surface:classic-white:classic')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID).overlayCacheKey, 'film-overlay:classic-white:classic')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).surfaceCacheKey, 'film-surface:classic-white:mosaic-seven')
+assert.equal(getFilmRenderModel(DEFAULT_FILM_ID, MOSAIC_LAYOUT_ID).overlayCacheKey, 'film-overlay:classic-white:mosaic-seven')
 
 for (const film of FILMS) {
   const model = getFilmRenderModel(film.id)

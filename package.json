@@ -8,7 +8,7 @@
     "build": "npm run icons && vite build && node scripts/generate-static-info-pages.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "preview": "vite preview",
-    "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs && node tests/rainbowGeometry.test.mjs && node tests/solidBackground.test.mjs && node tests/storageModel.test.mjs && node tests/films.test.mjs && node tests/filmChallengeUi.test.mjs && node tests/filmRendering.test.mjs && node tests/appRoutes.test.mjs && node tests/modalNavigation.test.mjs && node tests/infoContent.test.mjs && node tests/adsense.test.mjs && node tests/rootSite.test.mjs && node tests/crawlability.test.mjs && node tests/typography.test.mjs && node tests/sharing.test.mjs && node tests/i18n.test.mjs"
+    "test": "node tests/colorAnalysis.test.mjs && node tests/gestureTransform.test.mjs && node tests/rainbowGeometry.test.mjs && node tests/solidBackground.test.mjs && node tests/storageModel.test.mjs && node tests/appCollectionCoordinator.test.mjs && node tests/renderPerformance.test.mjs && node tests/films.test.mjs && node tests/filmChallengeUi.test.mjs && node tests/filmRendering.test.mjs && node tests/appRoutes.test.mjs && node tests/modalNavigation.test.mjs && node tests/infoContent.test.mjs && node tests/adsense.test.mjs && node tests/rootSite.test.mjs && node tests/crawlability.test.mjs && node tests/typography.test.mjs && node tests/sharing.test.mjs && node tests/i18n.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

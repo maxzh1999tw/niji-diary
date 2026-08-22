@@ -1,8 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzePixel, COLOR_KEYS } from './colorAnalysis.js'
-import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getSupportedFilmLayoutIds, MOSAIC_LAYOUT_ID, normalizeFilmCollection } from './films.js'
-import { getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidTypographyScale, scopeFilmRenderSvg } from './filmRendering.js'
+import { buildCaptionPersistencePlan, buildSelectedFilmCollection, buildSelectedLayoutCollection, createInitialFilmCollection, hydrateAppCollectionState } from './appCollectionCoordinator.js'
+import { createFilmChallenges, DEFAULT_FILM_ID, DEFAULT_LAYOUT_ID, ensureCustomCaptionChallenge, FILM_DAYPART_KEYS, FILMS, getCollectedFilmDayparts, getFilm, getFilmLayoutId, getFilmProgress, getFilmProgressChanges, getSupportedFilmLayoutIds, MOSAIC_LAYOUT_ID } from './films.js'
+import { createPolaroidRenderScene, DEFAULT_FILM_INK, DEFAULT_FILM_INK_MUTED, getFilmRenderModel, getPolaroidLayoutGeometry, getPolaroidLayoutStyle, getPolaroidTypographyScale, layoutPolaroidCaptionText, scopeFilmRenderSvg } from './filmRendering.js'
 import { preserveRainbowTopAnchor } from './rainbowGeometry.js'
 import { createSolidBackgroundSource, hslToHex, normalizeSolidBackgroundColor, rgbToHex, SOLID_BACKGROUND_PRESETS } from './solidBackground.js'
 import { formatText, getInitialLanguage, LANGUAGE_STORAGE_KEY, translations } from './i18n.js'
@@ -11,6 +12,7 @@ import { INFO_PAGE_META, infoContent } from './infoContent.js'
 import { applyPanDelta, applyPinchDelta } from './gestureTransform.js'
 import { importStorageSnapshot, LEGACY_IMPORT_OFFER, LEGACY_IMPORT_READY, LEGACY_IMPORT_RESPONSE, LEGACY_ORIGIN, NEW_APP_ORIGIN, sendLegacyStorageToNewSite } from './migration.js'
 import { appendModalHistoryToken, clearModalHistoryState, createModalHistoryToken, getModalHistoryStack, removeModalHistoryToken } from './modalNavigation.js'
+import { canvasToDataUrl, loadImageHandleGroup, loadImageSource } from './renderPerformance.js'
 import { createPolaroidShareData } from './sharing.js'
 import { COMPLETED_DAY_SCHEMA_VERSION, completeDraft, createCompletedDayRecord, deleteDay, loadCollectionState, migrateCompletedDay, requestPersistentStorage, saveDay, saveDraft, saveFilmCollection } from './storage.js'
 
@@ -19,8 +21,6 @@ const FALLBACK_COLORS = { red: '#ff527b', orange: '#ff9d3d', yellow: '#f4d629', 
 const COMPLETED_COLOR_SLOTS = Object.freeze(Object.fromEntries(COLOR_KEYS.map((key) => [key, true])))
 const FILM_PREVIEW_DATE = '2000-01-01'
 const FILM_PREVIEW_PHOTOS = {}
-const DEFAULT_FILM_INK = '#241435'
-const DEFAULT_FILM_INK_MUTED = '#625c63'
 const PENDING_FILM_SELECTION_KEY = 'niji-pending-film-selection'
 const FILM_DAYPART_LABEL_KEYS = Object.freeze({ morning: 'filmDaypartMorning', midday: 'filmDaypartMidday', night: 'filmDaypartNight' })
 const LAYOUT_NAME_KEYS = Object.freeze({ [DEFAULT_LAYOUT_ID]: 'layoutClassicName', [MOSAIC_LAYOUT_ID]: 'layoutMosaicName' })
@@ -141,17 +141,6 @@ function createEmptyDraft() {
   return { schemaVersion: 3, photos: {}, samples: {}, completedAt: null }
 }
 
-function withoutFilmCollectionMeta(collection) {
-  const { needsSave, ...persisted } = collection
-  return persisted
-}
-
-function createDefaultFilmCollection() {
-  const collection = withoutFilmCollectionMeta(normalizeFilmCollection(null))
-  if (!QA_MODE || !FILMS.some((film) => film.id === QA_FILM_ID)) return collection
-  return { ...collection, unlockedFilmIds: FILMS.map((film) => film.id), selectedFilmId: QA_FILM_ID }
-}
-
 function createQaFilmNotifications() {
   if (QA_MODE !== 'film-notification') return []
   const film = getFilm(FILMS.some((item) => item.id === QA_FILM_ID && item.unlock.type !== 'always') ? QA_FILM_ID : 'pink-pop')
@@ -207,8 +196,13 @@ async function processPhoto(file) {
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
 
   const analysis = sampleSourcePhoto(image, { x: 0.5, y: 0.5 })
-  image.close?.()
-  return { image: canvas.toDataURL('image/jpeg', 0.84), ...analysis }
+  try {
+    return { image: await canvasToDataUrl(canvas, { type: 'image/jpeg', quality: 0.84 }), ...analysis }
+  } finally {
+    image.close?.()
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 async function decodePhoto(file) {
@@ -224,15 +218,6 @@ async function decodePhoto(file) {
   } finally {
     URL.revokeObjectURL(url)
   }
-}
-
-function loadImageSource(source) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Unable to load image'))
-    image.src = source
-  })
 }
 
 function dataUrlToFile(dataUrl, filename) {
@@ -266,216 +251,213 @@ function drawCoverAt(context, image, x, y, width, height) {
   context.restore()
 }
 
-function fitCanvasText(context, text, maxWidth) {
-  if (context.measureText(text).width <= maxWidth) return text
-  let fitted = text
-  while (fitted.length && context.measureText(`${fitted}…`).width > maxWidth) fitted = fitted.slice(0, -1)
-  return `${fitted}…`
-}
-
-function wrapCanvasText(context, text, maxWidth, maxLines) {
-  const lines = ['']
-  let truncated = false
-  for (const character of Array.from(String(text))) {
-    if (character === '\r') continue
-    if (character === '\n') {
-      if (lines.length >= maxLines) {
-        truncated = true
-        break
-      }
-      lines.push('')
-      continue
-    }
-    const currentLine = lines.at(-1)
-    if (!currentLine || context.measureText(currentLine + character).width <= maxWidth) {
-      lines[lines.length - 1] = currentLine + character
-      continue
-    }
-    if (lines.length >= maxLines) {
-      truncated = true
-      break
-    }
-    lines.push(character)
-  }
-  if (truncated) lines[lines.length - 1] = fitCanvasText(context, `${lines.at(-1)}…`, maxWidth)
-  return lines
-}
-
 const POLAROID_CANVAS_FONT = '"Fredoka", "Noto Sans TC", "Segoe UI", sans-serif'
 
-function drawPolaroidCaption(context, day, fallbackCaption, layout, ink = DEFAULT_FILM_INK) {
-  const { caption: captionLayout } = layout
-  const caption = day.caption ?? fallbackCaption
+function wrapCanvasText(context, text, maxWidth, maxLines) {
+  return layoutPolaroidCaptionText(text, maxWidth, maxLines, (value) => context.measureText(value).width).lines
+}
+
+function createAppPolaroidScene(day, lang, fallbackCaption, options = {}) {
+  return createPolaroidRenderScene(day, {
+    fallbackCaption,
+    dateLabel: day?.date ? formatDate(day.date, lang, true) : '',
+    fallbackSamples: FALLBACK_COLORS,
+    ...options,
+  })
+}
+
+function drawPolaroidCaption(context, captionLayer) {
+  const captionLayout = { ...captionLayer.rect, maxLines: captionLayer.maxLines }
+  const caption = captionLayer.text
   context.save()
   context.beginPath()
   context.rect(captionLayout.x, captionLayout.y, captionLayout.width, captionLayout.height)
   context.clip()
   context.textBaseline = 'middle'
-  context.fillStyle = day.captionInk ?? ink
+  context.fillStyle = captionLayer.ink ?? DEFAULT_FILM_INK
   context.font = `600 ${captionLayout.fontSize}px ${POLAROID_CANVAS_FONT}`
   const lines = wrapCanvasText(context, caption, captionLayout.width, captionLayout.maxLines)
-  const firstBaseline = captionLayout.baselineY ?? captionLayout.y + captionLayout.lineHeight / 2
-  lines.forEach((line, index) => context.fillText(line, captionLayout.x, firstBaseline + index * captionLayout.lineHeight))
+  lines.forEach((line, index) => context.fillText(line, captionLayout.x, captionLayer.baselineY + index * captionLayer.lineHeight))
   context.restore()
 }
 
-function drawPolaroidDate(context, day, lang, layout, ink = DEFAULT_FILM_INK_MUTED) {
-  const { date } = layout
+function drawPolaroidDate(context, dateLayer) {
+  const { rect, text, ink, baselineY } = dateLayer
   context.textBaseline = 'middle'
-  context.fillStyle = ink
-  context.font = `600 ${date.fontSize}px ${POLAROID_CANVAS_FONT}`
+  context.fillStyle = ink ?? DEFAULT_FILM_INK_MUTED
+  context.font = `600 ${rect.fontSize}px ${POLAROID_CANVAS_FONT}`
   context.textAlign = 'right'
-  context.fillText(formatDate(day.date, lang, true), date.x + date.width, date.baselineY)
+  context.fillText(text, rect.x + rect.width, baselineY)
   context.textAlign = 'left'
+}
+
+function drawPolaroidSourceLayer(context, layer, sourceImages, index) {
+  const { x, y, width: sourceWidth, height: sourceHeight } = layer.rect
+  const innerX = layer.imageRect.x
+  const innerY = layer.imageRect.y
+  const innerWidth = layer.imageRect.width
+  const innerHeight = layer.imageRect.height
+  context.fillStyle = layer.frameFill
+  context.fillRect(x, y, sourceWidth, sourceHeight)
+  context.strokeStyle = layer.frameStroke
+  context.lineWidth = 1.5
+  context.strokeRect(x, y, sourceWidth, sourceHeight)
+  context.fillStyle = layer.sampleColor || FALLBACK_COLORS[layer.colorKey]
+  context.fillRect(innerX, innerY, innerWidth, innerHeight)
+  if (sourceImages[index]) {
+    drawCoverAt(context, sourceImages[index], innerX, innerY, innerWidth, innerHeight)
+  }
+  context.fillStyle = layer.sampleColor || FALLBACK_COLORS[layer.colorKey]
+  context.fillRect(layer.accentRect.x, layer.accentRect.y, layer.accentRect.width, layer.accentRect.height)
+}
+
+function drawPolaroidScene(context, scene, assets) {
+  let sourceLayerIndex = 0
+  for (const layer of scene.layers) {
+    if (layer.kind === 'surface' && assets.surface) {
+      context.drawImage(assets.surface, 0, 0, scene.layout.width, scene.layout.height)
+      continue
+    }
+    if (layer.kind === 'photo') {
+      const { rect } = layer
+      context.fillStyle = layer.fill
+      context.fillRect(rect.x, rect.y, rect.width, rect.height)
+      if (assets.mainImage) drawCoverAt(context, assets.mainImage, rect.x, rect.y, rect.width, rect.height)
+      context.strokeStyle = layer.stroke
+      context.lineWidth = 2
+      context.strokeRect(rect.x, rect.y, rect.width, rect.height)
+      continue
+    }
+    if (layer.kind === 'source') {
+      drawPolaroidSourceLayer(context, layer, assets.sourceImages ?? [], sourceLayerIndex)
+      sourceLayerIndex += 1
+      continue
+    }
+    if (layer.kind === 'overlay' && assets.overlay) {
+      context.drawImage(assets.overlay, 0, 0, scene.layout.width, scene.layout.height)
+      continue
+    }
+    if (layer.kind === 'caption') {
+      drawPolaroidCaption(context, layer)
+      continue
+    }
+    if (layer.kind === 'date') drawPolaroidDate(context, layer)
+  }
 }
 
 async function renderPolaroidImage(day, lang, fallbackCaption, includeCaption = true) {
   if (!day?.cardImage) throw new Error('Missing Rainbow Card image')
   await document.fonts?.ready
+  const scene = createAppPolaroidScene(day, lang, fallbackCaption, { includeCaption })
   const renderModel = getFilmRenderModel(day.filmId, day.layoutId)
-  const { width, height } = renderModel.layout
   const { photo, sourceRects } = renderModel.geometry
+  const { width, height } = scene.layout
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
-  const [filmSurface, filmOverlay] = await Promise.all([
-    loadImageSource(renderModel.surfaceUrl),
-    loadImageSource(renderModel.overlayUrl),
-  ])
-  context.drawImage(filmSurface, 0, 0, width, height)
-
-  const mainImage = await loadImageSource(day.cardImage)
-  context.fillStyle = '#e8e1ec'
-  context.fillRect(photo.x, photo.y, photo.width, photo.height)
-  drawCoverAt(context, mainImage, photo.x, photo.y, photo.width, photo.height)
-  context.strokeStyle = 'rgba(18,13,21,.1)'
-  context.lineWidth = 2
-  context.strokeRect(photo.x, photo.y, photo.width, photo.height)
-
-  const sourceImages = await Promise.all(COLOR_KEYS.map(async (key) => {
-    if (!day.photos?.[key]) return null
-    try { return await loadImageSource(day.photos[key]) } catch { return null }
-  }))
-
-  COLOR_KEYS.forEach((key, index) => {
-    const source = sourceRects[index]
-    const { x, y, width: sourceWidth, height: sourceHeight, innerX: insetX, innerY: insetY, innerBottom, accentHeight } = source
-    context.fillStyle = '#fffefa'
-    context.fillRect(x, y, sourceWidth, sourceHeight)
-    context.strokeStyle = 'rgba(69,60,67,.2)'
-    context.lineWidth = 1.5
-    context.strokeRect(x, y, sourceWidth, sourceHeight)
-    const innerX = x + insetX
-    const innerY = y + insetY
-    const innerWidth = sourceWidth - insetX * 2
-    const innerHeight = sourceHeight - innerBottom
-    context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
-    context.fillRect(innerX, innerY, innerWidth, innerHeight)
-    if (sourceImages[index]) {
-      drawCoverAt(context, sourceImages[index], innerX, innerY, innerWidth, innerHeight)
-    }
-    context.fillStyle = day.samples?.[key] || FALLBACK_COLORS[key]
-    context.fillRect(x, y + sourceHeight - accentHeight, sourceWidth, accentHeight)
-  })
-
-  // Keep the canvas layer order identical to PolaroidCard: paper, photo/sources,
-  // edge decorations, then footer text.
-  context.drawImage(filmOverlay, 0, 0, width, height)
-  if (includeCaption) drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout, renderModel.film.ink?.primary)
-  drawPolaroidDate(context, day, lang, renderModel.layout, renderModel.film.ink?.secondary)
-  return canvas.toDataURL('image/jpeg', 0.9)
+  void photo
+  void sourceRects
+  let sourceHandles = []
+  let surfaceHandle = null
+  let overlayHandle = null
+  let mainImageHandle = null
+  try {
+    sourceHandles = await loadImageHandleGroup(COLOR_KEYS.map((key) => async () => {
+      if (!day.photos?.[key]) return null
+      try { return await loadImageSource(day.photos[key]) } catch { return null }
+    }))
+    ;[surfaceHandle, overlayHandle, mainImageHandle] = await loadImageHandleGroup([
+      () => loadImageSource(renderModel.surfaceUrl, { cacheKey: renderModel.surfaceCacheKey }),
+      () => loadImageSource(renderModel.overlayUrl, { cacheKey: renderModel.overlayCacheKey }),
+      () => loadImageSource(day.cardImage),
+    ])
+    drawPolaroidScene(context, scene, {
+      surface: surfaceHandle.image,
+      overlay: overlayHandle.image,
+      mainImage: mainImageHandle.image,
+      sourceImages: sourceHandles.map((handle) => handle?.image ?? null),
+    })
+    return await canvasToDataUrl(canvas, { type: 'image/jpeg', quality: 0.9 })
+  } finally {
+    sourceHandles.forEach((handle) => handle?.release?.())
+    surfaceHandle?.release?.()
+    overlayHandle?.release?.()
+    mainImageHandle?.release?.()
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 async function renderCaptionlessPolaroid(day, lang, fallbackCaption) {
   if (day?.cardImage) return renderPolaroidImage(day, lang, fallbackCaption, false)
   if (!day?.polaroidImage) throw new Error('Missing completed Polaroid image')
 
+  const scene = createAppPolaroidScene(day, lang, fallbackCaption, { includeCaption: false })
   const renderModel = getFilmRenderModel(day.filmId, day.layoutId)
-  const { width, height, footer } = renderModel.layout
-  const [storedImage, filmSurface] = await Promise.all([
-    loadImageSource(day.polaroidImage),
-    loadImageSource(renderModel.surfaceUrl),
-  ])
+  const { width, height } = scene.layout
+  let storedImageHandle = null
+  let filmSurfaceHandle = null
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
-  context.drawImage(storedImage, 0, 0, width, height)
-
-  const clearY = footer.textY - 70
-  const clearWidth = width - footer.x * 2 - footer.dateWidth + footer.x
-  context.drawImage(filmSurface, 0, clearY, clearWidth, height - clearY, 0, clearY, clearWidth, height - clearY)
-  return canvas.toDataURL('image/jpeg', 0.9)
-}
-
-async function compactCompletedHistory(completedDays, lang, fallbackCaption) {
-  const compactedDays = []
-  for (const completedDay of completedDays) {
-    compactedDays.push(await migrateCompletedDay(
-      completedDay,
-      (record) => renderCaptionlessPolaroid(record, lang, fallbackCaption),
-    ))
+  try {
+    ;[storedImageHandle, filmSurfaceHandle] = await loadImageHandleGroup([
+      () => loadImageSource(day.polaroidImage),
+      () => loadImageSource(renderModel.surfaceUrl, { cacheKey: renderModel.surfaceCacheKey }),
+    ])
+    context.drawImage(storedImageHandle.image, 0, 0, width, height)
+    const { x, y, width: clearWidth, height: clearHeight } = scene.repair.clearRect
+    context.drawImage(filmSurfaceHandle.image, x, y, clearWidth, clearHeight, x, y, clearWidth, clearHeight)
+    return await canvasToDataUrl(canvas, { type: 'image/jpeg', quality: 0.9 })
+  } finally {
+    storedImageHandle?.release?.()
+    filmSurfaceHandle?.release?.()
+    canvas.width = 0
+    canvas.height = 0
   }
-  return compactedDays
-}
-
-async function backfillCaptionChallenges(completedDays, defaultCaption) {
-  const updatedDays = completedDays.map((day) => ensureCustomCaptionChallenge(day, defaultCaption))
-  const changedDays = updatedDays.filter((day, index) => day !== completedDays[index])
-  await Promise.all(changedDays.map(async (day) => {
-    try { await saveDay(day) } catch { /* keep the in-memory repair; the next load can retry it */ }
-  }))
-  return updatedDays
 }
 
 async function hydrateCollectionState(date, lang) {
-  const { completedDays, dailyLocked: savedDailyLock, draft, filmCollection: savedFilmCollection } = await loadCollectionState(date)
-  const compactedDays = await compactCompletedHistory(completedDays, lang, translations[lang].defaultCaption)
-  const repairedDays = await backfillCaptionChallenges(compactedDays, translations[lang].defaultCaption)
-  const normalizedFilmCollection = normalizeFilmCollection(savedFilmCollection, repairedDays)
-  const hydratedFilmCollection = withoutFilmCollectionMeta(normalizedFilmCollection)
-  if (normalizedFilmCollection.needsSave) await saveFilmCollection(hydratedFilmCollection)
-  const completedToday = repairedDays.find((item) => item.date === date) ?? null
-  const savedDay = completedToday ?? draft
-  const pendingFilmId = readPendingFilmSelection()
-  const recoveredFilmCollection = pendingFilmId && hydratedFilmCollection.unlockedFilmIds.includes(pendingFilmId)
-    ? withoutFilmCollectionMeta(normalizeFilmCollection({ ...hydratedFilmCollection, selectedFilmId: pendingFilmId }, repairedDays))
-    : hydratedFilmCollection
-
-  if (pendingFilmId) {
-    if (recoveredFilmCollection.selectedFilmId === pendingFilmId) {
-      saveFilmCollection(recoveredFilmCollection).then(() => clearPendingFilmSelection(pendingFilmId)).catch(() => {})
-    } else {
-      clearPendingFilmSelection(pendingFilmId)
-    }
-  }
-
-  return {
-    day: savedDay ? { ...savedDay, samples: savedDay.samples ?? {} } : createEmptyDraft(),
-    dailyLocked: savedDailyLock,
-    history: repairedDays,
-    filmCollection: recoveredFilmCollection,
-  }
+  return hydrateAppCollectionState({
+    date,
+    defaultCaption: translations[lang].defaultCaption,
+    loadCollectionState,
+    migrateCompletedDay,
+    renderCaptionlessPolaroid: (record) => renderCaptionlessPolaroid(record, lang, translations[lang].defaultCaption),
+    ensureCustomCaptionChallenge,
+    saveDay,
+    saveFilmCollection,
+    readPendingFilmSelection,
+    clearPendingFilmSelection,
+  })
 }
 
 async function getCompletedPolaroidImage(day, lang, fallbackCaption) {
   if (!day?.polaroidImage) return renderPolaroidImage(day, lang, fallbackCaption)
 
   await document.fonts?.ready
-  const renderModel = getFilmRenderModel(day.filmId, day.layoutId)
-  const { width, height } = renderModel.layout
+  const scene = createAppPolaroidScene(day, lang, fallbackCaption)
+  const { width, height } = scene.layout
   const baseImage = day.schemaVersion === COMPLETED_DAY_SCHEMA_VERSION
     ? day.polaroidImage
     : await renderCaptionlessPolaroid(day, lang, fallbackCaption)
-  const image = await loadImageSource(baseImage)
+  const imageHandle = await loadImageSource(baseImage)
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const context = canvas.getContext('2d', { alpha: false })
-  context.drawImage(image, 0, 0, width, height)
-  drawPolaroidCaption(context, day, fallbackCaption, renderModel.layout, renderModel.film.ink?.primary)
-  return canvas.toDataURL('image/jpeg', 0.9)
+  try {
+    context.drawImage(imageHandle.image, 0, 0, width, height)
+    const captionLayer = scene.layers.find((layer) => layer.kind === 'caption')
+    if (captionLayer) drawPolaroidCaption(context, captionLayer)
+    return await canvasToDataUrl(canvas, { type: 'image/jpeg', quality: 0.9 })
+  } finally {
+    imageHandle.release()
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 function sampleSourcePhoto(image, point) {
@@ -493,7 +475,8 @@ function sampleSourcePhoto(image, point) {
 }
 
 async function sampleImageSourceColor(source, point) {
-  const image = await loadImageSource(source)
+  const imageHandle = await loadImageSource(source)
+  const image = imageHandle.image
   const sourceWidth = image.naturalWidth || image.width
   const sourceHeight = image.naturalHeight || image.height
   const x = Math.max(0, Math.min(sourceWidth - 1, Math.floor(point.x * sourceWidth)))
@@ -502,13 +485,20 @@ async function sampleImageSourceColor(source, point) {
   canvas.width = 1
   canvas.height = 1
   const context = canvas.getContext('2d', { willReadFrequently: true })
-  context.drawImage(image, x, y, 1, 1, 0, 0, 1, 1)
-  const [red, green, blue] = context.getImageData(0, 0, 1, 1).data
-  return rgbToHex(red, green, blue)
+  try {
+    context.drawImage(image, x, y, 1, 1, 0, 0, 1, 1)
+    const [red, green, blue] = context.getImageData(0, 0, 1, 1).data
+    return rgbToHex(red, green, blue)
+  } finally {
+    imageHandle.release()
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 async function renderComposite(background, samples, transform) {
-  const image = await loadImageSource(background)
+  const imageHandle = await loadImageSource(background)
+  const image = imageHandle.image
   const canvas = document.createElement('canvas')
   canvas.width = 1200; canvas.height = 1500
   const context = canvas.getContext('2d', { alpha: false })
@@ -573,7 +563,15 @@ async function renderComposite(background, samples, transform) {
   context.globalCompositeOperation = 'source-over'
   context.drawImage(rainbowLayer, 0, 0)
   context.restore()
-  return canvas.toDataURL('image/jpeg', 0.88)
+  try {
+    return await canvasToDataUrl(canvas, { type: 'image/jpeg', quality: 0.88 })
+  } finally {
+    imageHandle.release()
+    rainbowLayer.width = 0
+    rainbowLayer.height = 0
+    canvas.width = 0
+    canvas.height = 0
+  }
 }
 
 function EnergyStrip({ photos, samples = {}, labels, interactive = false, onSelect }) {
@@ -590,23 +588,23 @@ function EnergyStrip({ photos, samples = {}, labels, interactive = false, onSele
   )
 }
 
-function PolaroidSourcePhoto({ colorKey, geometry, photos, samples, label, imageLoading }) {
-  const sample = samples[colorKey] || FALLBACK_COLORS[colorKey]
-  return <div className={`polaroid-source-photo source-${colorKey}`} style={{ ...geometry.cardStyle, '--sample': sample }}>
-    <span className="polaroid-source-image" style={geometry.imageCardStyle}>
-      {photos[colorKey] ? <img src={photos[colorKey]} alt={label} loading={imageLoading} /> : <i aria-hidden="true" />}
+function PolaroidSourcePhoto({ layer, label, imageLoading }) {
+  const sample = layer.sampleColor || FALLBACK_COLORS[layer.colorKey]
+  return <div className={`polaroid-source-photo source-${layer.colorKey}`} style={{ ...layer.cardStyle, '--sample': sample }}>
+    <span className="polaroid-source-image" style={layer.imageCardStyle}>
+      {layer.imageSource ? <img src={layer.imageSource} alt={label} loading={imageLoading} /> : <i aria-hidden="true" />}
     </span>
-    <i className="polaroid-source-accent" style={geometry.accentCardStyle} aria-hidden="true" />
+    <i className="polaroid-source-accent" style={layer.accentCardStyle} aria-hidden="true" />
   </div>
 }
 
-function PolaroidMediaLayout({ geometry, mainPhoto, photos = {}, samples = {}, labels, imageLoading = 'lazy' }) {
+function PolaroidMediaLayout({ geometry, scene, mainPhoto, labels, imageLoading = 'lazy' }) {
   return <div className="polaroid-media-layout" style={geometry.mediaStyle}>
     <div className="polaroid-main-slot" style={geometry.photoCardStyle}>
       {mainPhoto}
     </div>
     <div className="polaroid-layout-sources" aria-label={labels.join('、')}>
-      {COLOR_KEYS.map((key, index) => <PolaroidSourcePhoto key={key} colorKey={key} geometry={geometry.sources[index]} photos={photos} samples={samples} label={labels[index]} imageLoading={imageLoading} />)}
+      {scene.sourceLayers.map((layer, index) => <PolaroidSourcePhoto key={layer.id} layer={layer} label={labels[index]} imageLoading={imageLoading} />)}
     </div>
   </div>
 }
@@ -864,6 +862,10 @@ function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photoInt
   const film = getFilm(filmId)
   const resolvedLayoutId = getFilmLayoutId(film, layoutId)
   const geometry = getPolaroidLayoutGeometry(resolvedLayoutId)
+  const scene = createPolaroidRenderScene({ filmId: film.id, layoutId: resolvedLayoutId, date, photos, samples }, {
+    dateLabel: dateLabel ?? formatDate(date, lang, true),
+    fallbackSamples: FALLBACK_COLORS,
+  })
   const { captionRef, dateRef } = usePolaroidTypography(geometry)
   const filmStyle = {
     ...getPolaroidLayoutStyle(resolvedLayoutId),
@@ -872,19 +874,19 @@ function PolaroidCard({ image, alt, media, overlay, interactionOverlay, photoInt
     '--film-ink-muted': film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED,
   }
   const mainPhoto = <div className={`polaroid-photo ${photoClassName}`} {...photoInteraction}>{image ? <img src={image} alt={alt} loading={imageLoading} /> : media}{overlay}</div>
-  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} mainPhoto={mainPhoto} photos={photos} samples={samples} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div ref={captionRef} className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}><span ref={dateRef} className="polaroid-date-text">{dateLabel ?? formatDate(date, lang, true)}</span></time></div>{interactionOverlay}</div>
+  return <div className={`polaroid-card layout-${resolvedLayoutId} ${film.className} ${className}`} style={filmStyle} aria-hidden={decorative || undefined}><FilmSurface filmId={film.id} layoutId={resolvedLayoutId} /><PolaroidMediaLayout geometry={geometry} scene={scene} mainPhoto={mainPhoto} labels={labels} imageLoading={imageLoading} /><div className="polaroid-footer"><div ref={captionRef} className="polaroid-caption-slot" style={geometry.captionCardStyle}>{children}</div><time className="polaroid-date" style={geometry.dateCardStyle} dateTime={date}><span ref={dateRef} className="polaroid-date-text">{scene.dateText}</span></time></div>{interactionOverlay}</div>
 }
 
 function CompletedPolaroid({ item, alt, lang, t, className = '', imageLoading = 'lazy', editable = false, onCaptionChange, onCaptionCommit }) {
-  const storedGeometry = getPolaroidLayoutGeometry(item.layoutId)
-  const { captionRef } = usePolaroidTypography(item.polaroidImage ? storedGeometry : null)
+  const storedScene = createAppPolaroidScene(item, lang, t.defaultCaption)
+  const geometry = storedScene.geometry
+  const { captionRef } = usePolaroidTypography(item.polaroidImage ? geometry : null)
   if (item.polaroidImage) {
     const caption = item.caption ?? t.defaultCaption
-    const geometry = storedGeometry
-    const multiline = geometry.layout.id === MOSAIC_LAYOUT_ID
-    return <div className={`polaroid-card stored-polaroid layout-${geometry.layout.id} ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
+    const multiline = storedScene.layout.id === MOSAIC_LAYOUT_ID
+    return <div className={`polaroid-card stored-polaroid layout-${storedScene.layout.id} ${className}`} style={item.captionInk ? { '--film-ink': item.captionInk } : undefined}>
       <img src={item.polaroidImage} alt={alt} loading={imageLoading} />
-      {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} layoutId={geometry.layout.id} /></div> : null}
+      {item.schemaVersion !== COMPLETED_DAY_SCHEMA_VERSION ? <div className="stored-polaroid-caption-repair"><FilmSurface filmId={item.filmId} layoutId={storedScene.layout.id} /></div> : null}
       <div ref={captionRef} className="stored-polaroid-caption-slot" style={geometry.captionCardStyle}>{editable ? <EditablePolaroidCaption value={caption} t={t} multiline={multiline} onChange={onCaptionChange} onCommit={onCaptionCommit} /> : <PolaroidCaption>{caption}</PolaroidCaption>}</div>
     </div>
   }
@@ -2008,7 +2010,7 @@ export default function App() {
   const [day, setDay] = useState(null)
   const [dailyLocked, setDailyLocked] = useState(false)
   const [history, setHistory] = useState([])
-  const [filmCollection, setFilmCollection] = useState(createDefaultFilmCollection)
+  const [filmCollection, setFilmCollection] = useState(() => createInitialFilmCollection({ qaMode: QA_MODE, qaFilmId: QA_FILM_ID }))
   const [filmNotifications, setFilmNotifications] = useState(createQaFilmNotifications)
   const [selectedDay, setSelectedDay] = useState(null)
   const [staged, setStaged] = useState(QA_SAMPLE)
@@ -2249,7 +2251,7 @@ export default function App() {
 
   function selectFilm(filmId) {
     if (!filmCollectionReady || !filmCollection.unlockedFilmIds.includes(filmId) || filmCollection.selectedFilmId === filmId) return
-    const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection({ ...filmCollection, selectedFilmId: filmId }, history))
+    const nextFilmCollection = buildSelectedFilmCollection(filmCollection, history, filmId)
     rememberPendingFilmSelection(filmId)
     setFilmCollection(nextFilmCollection)
     saveFilmCollection(nextFilmCollection).then(() => clearPendingFilmSelection(filmId)).catch(() => showMessage(t.error))
@@ -2257,9 +2259,8 @@ export default function App() {
 
   function selectLayout(layoutId) {
     if (!filmCollectionReady) return
-    const selectedLayoutId = getFilmLayoutId(filmCollection.selectedFilmId, layoutId)
-    if (filmCollection.selectedLayoutId === selectedLayoutId) return
-    const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection({ ...filmCollection, selectedLayoutId }, history))
+    const nextFilmCollection = buildSelectedLayoutCollection(filmCollection, history, layoutId)
+    if (filmCollection.selectedLayoutId === nextFilmCollection.selectedLayoutId) return
     setFilmCollection(nextFilmCollection)
     saveFilmCollection(nextFilmCollection).catch(() => showMessage(t.error))
   }
@@ -2379,7 +2380,7 @@ export default function App() {
       await completeDraft(completedDay, date)
       await requestPersistentStorage()
       const nextHistory = [completedDay, ...history.filter((item) => item.date !== date)]
-      const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection(filmCollection, nextHistory))
+      const nextFilmCollection = buildSelectedFilmCollection(filmCollection, nextHistory, filmCollection.selectedFilmId)
       const nextFilmNotifications = getFilmProgressChanges(history, nextHistory)
         .filter((notification) => !filmCollection.unlockedFilmIds.includes(notification.filmId))
         .map((notification) => ({ ...notification, id: `${completedDay.completedAt}-${notification.filmId}` }))
@@ -2463,17 +2464,15 @@ export default function App() {
 
   async function persistCaption(target, caption = target?.caption) {
     if (!target) return
-    const nextTarget = ensureCustomCaptionChallenge({ ...target, caption }, t.defaultCaption)
-    const nextHistory = history.some((item) => item?.date === nextTarget.date)
-      ? history.map((item) => item?.date === nextTarget.date ? nextTarget : item)
-      : [nextTarget, ...history]
-    const nextFilmCollection = withoutFilmCollectionMeta(normalizeFilmCollection(filmCollection, nextHistory))
-    const nextFilmNotifications = getFilmProgressChanges(history, nextHistory)
-      .filter((notification) => !filmCollection.unlockedFilmIds.includes(notification.filmId))
-      .map((notification) => ({ ...notification, id: `${nextTarget.completedAt ?? nextTarget.date}-${notification.filmId}` }))
-    const filmCollectionChanged = filmCollection.selectedFilmId !== nextFilmCollection.selectedFilmId
-      || filmCollection.unlockedFilmIds.length !== nextFilmCollection.unlockedFilmIds.length
-      || filmCollection.unlockedFilmIds.some((filmId, index) => filmId !== nextFilmCollection.unlockedFilmIds[index])
+    const { nextTarget, nextHistory, nextFilmCollection, nextFilmNotifications, filmCollectionChanged } = buildCaptionPersistencePlan({
+      target,
+      caption,
+      defaultCaption: t.defaultCaption,
+      history,
+      filmCollection,
+      ensureCustomCaptionChallenge,
+      getFilmProgressChanges,
+    })
     try { await saveDay(nextTarget) }
     catch { showMessage(t.error); return }
 

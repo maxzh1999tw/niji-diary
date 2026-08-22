@@ -1,4 +1,19 @@
+import { COLOR_KEYS } from './colorAnalysis.js'
 import { DEFAULT_LAYOUT_ID, getFilm, getFilmArtwork, getFilmLayoutId, MOSAIC_LAYOUT_ID } from './films.js'
+
+export const DEFAULT_FILM_INK = '#241435'
+export const DEFAULT_FILM_INK_MUTED = '#625c63'
+export const POLAROID_MAIN_PHOTO_FILL = '#e8e1ec'
+export const POLAROID_MAIN_PHOTO_STROKE = 'rgba(18,13,21,.1)'
+export const POLAROID_SOURCE_FILL = '#fffefa'
+export const POLAROID_SOURCE_STROKE = 'rgba(69,60,67,.2)'
+export const POLAROID_RENDER_LAYER_IDS = Object.freeze({
+  surface: 'paper-surface',
+  photo: 'main-photo',
+  overlay: 'film-overlay',
+  caption: 'footer-caption',
+  date: 'footer-date',
+})
 
 export const POLAROID_SOURCE_FRAME = Object.freeze({ innerX: 7, innerY: 7, innerBottom: 22, accentHeight: 8 })
 
@@ -287,11 +302,160 @@ export function getFilmRenderModel(filmId, layoutId = DEFAULT_LAYOUT_ID) {
     geometry,
     svg,
     overlaySvg,
+    surfaceCacheKey: `film-surface:${cacheKey}`,
+    overlayCacheKey: `film-overlay:${cacheKey}`,
     surfaceUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
     overlayUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(overlaySvg)}`,
   })
   renderModelCache.set(cacheKey, model)
   return model
+}
+
+function freezeSceneLayer(layer) {
+  return Object.freeze(layer)
+}
+
+function resolveCaptionText(day, fallbackCaption = '') {
+  return typeof day?.caption === 'string' ? day.caption : fallbackCaption
+}
+
+function resolveDateText(dateLabel = '') {
+  return typeof dateLabel === 'string' ? dateLabel : ''
+}
+
+export function layoutPolaroidCaptionText(text, maxWidth, maxLines, measureText) {
+  if (!Number.isFinite(maxWidth) || maxWidth <= 0 || !Number.isInteger(maxLines) || maxLines <= 0 || typeof measureText !== 'function') {
+    return Object.freeze({ lines: Object.freeze([String(text ?? '')]), truncated: false })
+  }
+  const lines = ['']
+  let truncated = false
+  const measure = (value) => {
+    const width = measureText(value)
+    return Number.isFinite(width) ? width : Number.POSITIVE_INFINITY
+  }
+  for (const character of Array.from(String(text ?? ''))) {
+    if (character === '\r') continue
+    if (character === '\n') {
+      if (lines.length >= maxLines) {
+        truncated = true
+        break
+      }
+      lines.push('')
+      continue
+    }
+    const currentLine = lines.at(-1)
+    if (!currentLine || measure(currentLine + character) <= maxWidth) {
+      lines[lines.length - 1] = currentLine + character
+      continue
+    }
+    if (lines.length >= maxLines) {
+      truncated = true
+      break
+    }
+    lines.push(character)
+  }
+  if (truncated) {
+    let fitted = `${lines.at(-1)}…`
+    while (fitted.length && measure(fitted) > maxWidth) fitted = `${fitted.slice(0, -2)}…`
+    lines[lines.length - 1] = fitted
+  }
+  return Object.freeze({ lines: Object.freeze(lines), truncated })
+}
+
+export function createPolaroidRenderScene(day = {}, {
+  fallbackCaption = '',
+  dateLabel = '',
+  includeCaption = true,
+  includeDate = true,
+  fallbackSamples = {},
+} = {}) {
+  const renderModel = getFilmRenderModel(day?.filmId, day?.layoutId)
+  const { film, layout, geometry } = renderModel
+  const captionText = resolveCaptionText(day, fallbackCaption)
+  const dateText = resolveDateText(dateLabel)
+  const captionInk = day?.captionInk ?? film.ink?.primary ?? DEFAULT_FILM_INK
+  const dateInk = film.ink?.secondary ?? DEFAULT_FILM_INK_MUTED
+  const sourceLayers = COLOR_KEYS.map((key, index) => {
+    const source = geometry.sources[index]
+    return freezeSceneLayer({
+      id: `source-${key}`,
+      kind: 'source',
+      colorKey: key,
+      rect: source.rect,
+      imageRect: source.imageRect,
+      accentRect: source.accentRect,
+      cardStyle: source.cardStyle,
+      imageCardStyle: source.imageCardStyle,
+      accentCardStyle: source.accentCardStyle,
+      thumbnailStyle: source.thumbnailStyle,
+      sampleColor: day?.samples?.[key] ?? fallbackSamples[key] ?? null,
+      imageSource: day?.photos?.[key] ?? null,
+      frameFill: POLAROID_SOURCE_FILL,
+      frameStroke: POLAROID_SOURCE_STROKE,
+    })
+  })
+  const layers = [
+    freezeSceneLayer({ id: POLAROID_RENDER_LAYER_IDS.surface, kind: 'surface', svg: renderModel.svg, url: renderModel.surfaceUrl }),
+    freezeSceneLayer({
+      id: POLAROID_RENDER_LAYER_IDS.photo,
+      kind: 'photo',
+      rect: geometry.photo,
+      imageSource: day?.cardImage ?? null,
+      fill: POLAROID_MAIN_PHOTO_FILL,
+      stroke: POLAROID_MAIN_PHOTO_STROKE,
+      cropMode: 'cover',
+      photoCardStyle: geometry.photoCardStyle,
+      photoThumbnailStyle: geometry.photoThumbnailStyle,
+    }),
+    ...sourceLayers,
+    freezeSceneLayer({ id: POLAROID_RENDER_LAYER_IDS.overlay, kind: 'overlay', svg: renderModel.overlaySvg, url: renderModel.overlayUrl }),
+  ]
+  if (includeCaption) {
+    layers.push(freezeSceneLayer({
+      id: POLAROID_RENDER_LAYER_IDS.caption,
+      kind: 'caption',
+      text: captionText,
+      ink: captionInk,
+      rect: layout.caption,
+      cardStyle: geometry.captionCardStyle,
+      baselineY: layout.caption.baselineY ?? layout.caption.y + layout.caption.lineHeight / 2,
+      lineHeight: layout.caption.lineHeight,
+      maxLines: layout.caption.maxLines,
+      verticalAlign: layout.caption.verticalAlign,
+    }))
+  }
+  if (includeDate) {
+    layers.push(freezeSceneLayer({
+      id: POLAROID_RENDER_LAYER_IDS.date,
+      kind: 'date',
+      text: dateText,
+      ink: dateInk,
+      rect: layout.date,
+      cardStyle: geometry.dateCardStyle,
+      baselineY: layout.date.baselineY,
+      textAlign: 'right',
+    }))
+  }
+
+  const scene = Object.freeze({
+    film,
+    layout,
+    geometry,
+    captionText,
+    dateText,
+    sourceLayers: Object.freeze(sourceLayers),
+    layers: Object.freeze(layers),
+    repair: Object.freeze({
+      needsCaptionRepair: Boolean(day?.polaroidImage) && day?.schemaVersion !== undefined,
+      clearRect: Object.freeze({
+        x: 0,
+        y: layout.footer.textY - 70,
+        width: layout.width - layout.footer.x * 2 - layout.footer.dateWidth + layout.footer.x,
+        height: layout.height - (layout.footer.textY - 70),
+      }),
+    }),
+  })
+  return scene
 }
 
 const layoutStyleCache = new WeakMap()

@@ -5,14 +5,16 @@ const [appSource, appStyles] = await Promise.all([
   readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
   readFile(new URL('../src/styles.css', import.meta.url), 'utf8'),
 ])
+const coordinatorSource = await readFile(new URL('../src/appCollectionCoordinator.js', import.meta.url), 'utf8')
 
 assert.doesNotMatch(appSource, /FilmChallengeStatus|film-challenge-summary|toolbar-challenge-check|challengeResults|challengeFilms|activeChallengeFilm|captionChallengeFilm/, 'challenge feedback must not render inside Rainbow Studio')
 assert.match(appSource, /function FilmProgressBookmark\(/, 'challenge feedback should use the bookmark notification')
 assert.match(appSource, /const nextFilmNotifications = getFilmProgressChanges\(history, nextHistory\)/)
 assert.match(appSource, /filmChallenges: createFilmChallenges\(completionSource, t\.defaultCaption\)/)
-assert.match(appSource, /function backfillCaptionChallenges\(/)
-assert.match(appSource, /ensureCustomCaptionChallenge\(day, defaultCaption\)/)
+assert.match(coordinatorSource, /export async function repairCompletedCaptionChallenges\(/)
+assert.match(coordinatorSource, /ensureCustomCaptionChallenge\(day, defaultCaption\)/)
 assert.match(appSource, /async function persistCaption\(target, caption = target\?\.caption\)/)
+assert.match(appSource, /buildCaptionPersistencePlan\(\{/)
 assert.match(appSource, /onCaptionCommit=\{\(caption\) => persistCaption\(selectedDay, caption\)\}/)
 assert.match(appSource, /onClick=\{finishWithLatestCaption\}/)
 assert.match(appSource, /key: 'colorWidth',[^\n]+min: 0\.5, max: 2/)
@@ -105,7 +107,7 @@ assert.match(appStyles, /\.film-layout-support > div \{[^}]*flex-direction: colu
 assert.match(appStyles, /\.film-layout-support-item \{[^}]*width: 36px;[^}]*min-height: 54px;[^}]*padding: 0;[^}]*border: 0;[^}]*background: transparent;[^}]*box-shadow: none;/, 'additional layout thumbnails must render without an inner frame or background')
 assert.match(appStyles, /\.film-layout-support-item \.layout-thumbnail \{[^}]*width: 36px;/, 'additional layout thumbnails must be enlarged and shifted toward the divider')
 assert.doesNotMatch(appStyles, /\.editor-dock \{[^}]*box-shadow: [^;}]*rgba\(255,79,186/, 'the editor dock must not add a purple separator below the studio background')
-assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow: hidden;[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally within the shared slot')
+assert.match(appStyles, /\.layout-mosaic-seven \.polaroid-caption-text, \.layout-mosaic-seven \.polaroid-caption-input \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*white-space: pre-wrap;/, 'corner-layout captions must wrap naturally within the shared slot')
 assert.match(appStyles, /--polaroid-caption-font-size/, 'caption typography must expose the canonical font size to every renderer')
 assert.match(appStyles, /--polaroid-caption-line-height-px/, 'caption typography must expose the canonical line height to every renderer')
 assert.match(appStyles, /transform: scale\(var\(--polaroid-caption-visual-scale, 1\)\)/, 'caption layers must scale visually from the shared canonical text metrics')
